@@ -1,0 +1,43 @@
+=======
+SSOsoft
+=======
+
+Data reduction tools for the Sunspot Solar Observatory
+Consortium.
+
+
+Features
+--------
+
+At present, SSOsoft is a simple-to-use class to calibrate
+and prepare ROSA and HaRDcam data from the Sunspot Solar
+Observatory. At present, full ROSA functionality is not
+supported, but SSOsoft is able to produce the necessary
+image bursts for processing with the Kiepenheuer-Institut
+Speckle Interferometry Package (KISIP, F. Woeger, National
+Solar Observatory).
+
+
+To do
+-----
+
+	* Implement seamless end-to-end calibration by developing
+	a container class for running KISIP.
+	* Generalize tools to allow SSOsoft to be able to reduce
+	ROSA data.
+
+
+Future
+------
+
+SSOsoft will be able to run other SSOC data reduction
+pipelines for IBIS, SPINOR, and FIRS datasets.
+
+
+Credit
+------
+
+Christian Beck, National Solar Observatory.
+David Jess, Queens University, Belfast.
+Friedrich Weoger, National Solar Observatory.
+

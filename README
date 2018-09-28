@@ -1,9 +1,22 @@
-=======
-SSOsoft
-=======
+ _______________________________________________________________________
+|       ____     ____     ____                                          | 
+|      /    \   /    \   /    \                                         | 
+|     /      \ /      \ /      \                                        | 
+|    |   |___||   |___||   |   |                                        | 
+|    |   |    |   |    |   |   |                                        | 
+|    |   |    |   |    |   |   |                                        | 
+|     \   \    \   \   |   |   |  ______   ______   ______   ______     | 
+|      \   \    \   \  |   |   | /      \ /      \ /      \ /      \    | 
+|       \   \    \   \ |   |   ||   |___||   |   ||    ___||_   ___|    | 
+|        |   |    |   ||   |   | \   \   |   |   ||   |__    |  |       | 
+|     ___|   | ___|   ||   |   |  \   \  |   |   ||      \   |  |       | 
+|    |   |   ||   |   ||   |   | __\   \ |   |   ||    __/   |  |       | 
+|    \      / \      / \      / |   |   ||   |   ||   |      |  |       |
+|     \____/   \____/   \____/  \______/ \______/ \___/      \__/       | 
+|_______________________________________________________________________|
 
-Data reduction tools for the Sunspot Solar Observatory
-Consortium.
+SSOsoft is a set of tools for reducing data from the
+Sunspot Solar Observatory.
 
 
 Features
@@ -11,16 +24,23 @@ Features
 
 At present, SSOsoft is a simple-to-use class to calibrate
 and prepare ROSA and HaRDcam data from the Sunspot Solar
-Observatory. At present, full ROSA functionality is not
-supported, but SSOsoft is able to produce the necessary
-image bursts for processing with the Kiepenheuer-Institut
-Speckle Interferometry Package (KISIP, F. Woeger, National
-Solar Observatory).
+Observatory. The full ROSA functionality is not yet
+supported. SSOsoft is able to produce all of the necessary
+HaRDcam image bursts for processing with the
+Kiepenheuer-Institut Speckle Interferometry Package (KISIP,
+F. Woeger, National Solar Observatory).
 
++---------------------------------------------------------+
+|		     !!!REPORT BUGS!!!			  |
+|							  |
+|	Please report any bugs to gordonm@nmsu.edu.	  |
++---------------------------------------------------------+
 
 To do
 -----
-
+	
+	* Develop tests for file I/O opterations and data
+	descriptors.
 	* Implement seamless end-to-end calibration by developing
 	a container class for running KISIP.
 	* Generalize tools to allow SSOsoft to be able to reduce
@@ -41,3 +61,28 @@ Christian Beck, National Solar Observatory.
 David Jess, Queens University, Belfast.
 Friedrich Weoger, National Solar Observatory.
 
+
+Software requirements
+---------------------
+
+Python 3.x
+Matplotlib
+NumPy
+Astropy
+
+
+How to use
+----------
+
+Using SSOsoft is easy.
+
+	* Create a configuration file in ini syntax (see the
+	included sample for reference).
+	* Open a python terminal.
+	* import ssosoft
+	* Create an instance of the RosaHardCamCal(<config file>),
+	where <config file> is a string containing the location of
+	the ini file created in the first step.
+	* Run the rosa_hardcam_run_calibration() method.
+	* Have a look at other methods in the class if you would
+	like to customize your calibration run.

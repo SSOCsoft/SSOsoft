@@ -30,7 +30,6 @@ class RosaHardCamCal:
 		self.flatList=[""]
 		self.gain=[]
 		self.imageShape=None
-		self.namesRenum=False
 		self.obsDate=""
 		self.obsTime=""
 		self.preSpeckleBase=""
@@ -63,7 +62,8 @@ class RosaHardCamCal:
 		## if not, create them.
 
 	def rosa_hardcam_compute_gain(self):
-		self.gain=np.median(self.avgFlat)/(self.avgFlat-self.avgDark)
+		darkSubtracted=self.avgFlat-self.avgDark
+		self.gain=np.median(darkSubtracted)/(darkSubtracted)
 	
 	def rosa_hardcam_detect_dims(self, imageData):
 		## Detects data then usable image dimensions.
@@ -128,7 +128,7 @@ class RosaHardCamCal:
 				)
 		plt.show()
 
-	def rosa_hardcam_get_file_lists(self):
+	def rosa_hardcam_get_file_lists(stlf):
 		self.darkList=sorted(glob.glob(self.darkBase+self.filePattern))
 		self.dataList=sorted(glob.glob(self.dataBase+self.filePattern))
 		self.flatList=sorted(glob.glob(self.flatBase+self.filePattern))
@@ -147,52 +147,32 @@ class RosaHardCamCal:
 			im[i, :]=imageData[i*self.dataShape[1]:(i+1)*self.dataShape[1]]
 		im=im[0:self.imageShape[0], 0:self.imageShape[1]]
 		imageFile.close()
-		return np.float32(im[::-1, ::-1].T)
+		return np.float32(im)
 
-	def rosa_hardcam_renumber_files(self):
-		if not self.namesRenum:
+	def rosa_hardcam_order_files(self):
+		def rosa_hardcam_order_file_list(fList):
+			orderList=['']*len(fList) ## List length same as fList
 			ptrn='[0-9]+'	#Match any digit one or more times.
 			p=re.compile(ptrn)
-			## Do darks, flats, then data.
-			for dark in self.darkList:
-				head, tail=os.path.split(dark)
+			for f in fList:
+				head, tail=os.path.split(f)
 				match=p.match(tail)
 				if match:
-					darkDigitNew=match.group()[::-1]
-					darkNameNew=darkDigitNew+'.'+tail[match.end():]
-					os.rename(dark, os.path.join(head, darkNameNew))
-					#print(head+'/'+darkNameNew)
+					digitNew=match.group()[::-1]
+					orderList[int(digitNew)]=f
 				else:
 					print("Invalid filename format for dark.")
+			return orderList
 
-			for flat in self.flatList:
-				head, tail=os.path.split(flat)
-				match=p.match(tail)
-				if match:
-					flatDigitNew=match.group()[::-1]
-					flatNameNew=flatDigitNew+'.'+tail[match.end():]
-					os.rename(flat, os.path.join(head, flatNameNew))
-					#print(head+'/'+flatNameNew)
-				else:
-					print("Invalid filename format for flat.")
-
-			for data in self.dataList:
-				head, tail=os.path.split(data)
-				match=p.match(tail)
-				if match:
-					dataDigitNew=match.group()[::-1]
-					dataNameNew=dataDigitNew+'.'+tail[match.end():]
-					os.rename(data, os.path.join(head, dataNameNew))
-					#print(head+'/'+dataNameNew)
-				else:
-					print("Invalid filename format for data.")
-			self.namesRenum=True
+		self.darkList=rosa_hardcam_order_file_list(self.darkList)
+		self.flatList=rosa_hardcam_order_file_list(self.flatList)
+		self.dataList=rosa_hardcam_order_file_list(self.dataList)
 
 	def rosa_hardcam_run_calibration(self):
 		self.rosa_hardcam_configure_run()
 		self.rosa_hardcam_get_file_lists()
-		self.rosa_hardcam_renumber_files()
-		self.rosa_hardcam_get_file_lists()
+		self.rosa_hardcam_order_files()
+		#self.rosa_hardcam_get_file_lists()
 		self.rosa_hardcam_get_data_image_shapes(self.flatList[0])
 		self.avgDark=self.rosa_hardcam_average_image_from_list(
 				self.darkList
@@ -233,7 +213,8 @@ class RosaHardCamCal:
 				i+=1
 			## Construct filename.
 			burstFile=os.path.join(self.preSpeckleBase,
-					"kisip.raw.batch."+"%04d" % burst
+					"%s_%s_kisip.raw.batch.%04d" %
+					(self.obsDate, self.obsTime, burst)
 					)
 			## Save burstCube
 			f=open(burstFile, mode='wb')

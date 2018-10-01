@@ -128,7 +128,7 @@ class RosaHardCamCal:
 				)
 		plt.show()
 
-	def rosa_hardcam_get_file_lists(stlf):
+	def rosa_hardcam_get_file_lists(self):
 		self.darkList=sorted(glob.glob(self.darkBase+self.filePattern))
 		self.dataList=sorted(glob.glob(self.dataBase+self.filePattern))
 		self.flatList=sorted(glob.glob(self.flatBase+self.filePattern))

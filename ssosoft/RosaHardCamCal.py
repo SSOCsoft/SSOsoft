@@ -97,7 +97,7 @@ class RosaHardCamCal:
 		##	Could be done by examining the number
 		## 	of results in ovrScn.
 		ovrScn=rosa_hardcam_detect_overscan()
-		datDim=(np.uint16(imageData.size/ovrScn[1]+1),
+		datDim=(np.uint16(imageData.size/ovrScn[1]),
 				ovrScn[1])
 		## Detects usable image columns by using
 		## the first overscan index. Finds first
@@ -142,11 +142,9 @@ class RosaHardCamCal:
 	def rosa_hardcam_read_binary_image(self, file):
 		imageFile=open(file, mode='rb')
 		imageData=np.fromfile(imageFile, dtype=np.uint16)
-		im=np.empty(self.dataShape, dtype=np.uint16)
-		for i in np.arange(self.dataShape[0]-1):
-			im[i, :]=imageData[i*self.dataShape[1]:(i+1)*self.dataShape[1]]
-		im=im[0:self.imageShape[0], 0:self.imageShape[1]]
 		imageFile.close()
+		im=imageData.reshape((self.dataShape))
+		im=im[0:self.imageShape[0], 0:self.imageShape[1]]
 		return np.float32(im)
 
 	def rosa_hardcam_order_files(self):
@@ -212,13 +210,16 @@ class RosaHardCamCal:
 				burstCube[:, :, i]=rosa_hardcam_flatfield_correction()
 				i+=1
 			## Construct filename.
+			burstThsnds=burst//1000
+			burstHndrds=burst%1000
 			burstFile=os.path.join(self.preSpeckleBase,
-					"%s_%s_kisip.raw.batch.%04d" %
-					(self.obsDate, self.obsTime, burst)
+					"%s_%s_kisip.raw.batch.%02d.%03d" %
+					(self.obsDate, self.obsTime, burstThsnds, burstHndrds)
 					)
 			## Save burstCube
 			f=open(burstFile, mode='wb')
-			burstCube.tofile(f)	## Saving the file using Numpy.
+			## Reverse axis order to save fortran-style.
+			burstCube.swapaxes(0,2).tofile(f)
 			f.close()
 			burst+=1
 

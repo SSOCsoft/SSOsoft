@@ -46,6 +46,7 @@ To do
 	descriptors.
 	* Develop a test for the integrity of automatic image shape
 	detection results.
+	* Include logging features.
 	* Implement seamless end-to-end calibration by developing
 	a container class for running KISIP.
 	* Generalize tools to allow SSOsoft to be able to reduce
@@ -63,7 +64,7 @@ Acknowledgements
 ----------------
 
 We appreciate all the hard work done by the following
-people, without which this project would have been a lot
+people, without whom this project would have been a lot
 harder.
 
 	* Christian Beck, National Solar Observatory.

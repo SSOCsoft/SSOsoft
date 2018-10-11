@@ -58,8 +58,21 @@ class RosaHardCamCal:
 		self.obsTime=config['HARDCAM']['obsTime']
 		self.preSpeckleBase=config['HARDCAM']['preSpeckleBase']
 
-		## LATER: check to be sure all directories and files exist,
-		## if not, create them.
+		## darkBase, dataBase, and flatBase directories must exist.
+		if not os.path.isdir(self.darkBase):
+			raise FileNotFoundError(self.darkBase)
+		if not os.path.isdir(self.dataBase):
+			raise FileNotFoundError(self.dataBase)
+		if not os.path.isdir(self.flatBase):
+			raise FileNotFoundError(self.flatBase)
+
+		## If preSpeckleBase directory doesn't exist and is not a
+		## regular file, then create it.
+		if os.path.isfile(self.preSpeckleBase):
+			raise FileExistsError(self.preSpeckleBase)
+		elif not os.path.isdir(self.preSpeckleBase):
+			print('os.mkdir:', self.preSpeckleBase)
+			os.mkdir(self.preSpeckleBase)
 
 	def rosa_hardcam_compute_gain(self):
 		darkSubtracted=self.avgFlat-self.avgDark
@@ -217,10 +230,11 @@ class RosaHardCamCal:
 					(self.obsDate, self.obsTime, burstThsnds, burstHndrds)
 					)
 			## Save burstCube
-			f=open(burstFile, mode='wb')
-			## Reverse axis order to save fortran-style.
-			burstCube.swapaxes(0,2).tofile(f)
-			f.close()
+			#f=open(burstFile, mode='wb')
+			with open(burstFile, mode='wb') as f:
+				## Reverse axis order to save fortran-style.
+				burstCube.swapaxes(0,2).tofile(f)
+			#f.close()
 			burst+=1
 
 	def rosa_hardcam_save_fits_image(self, image, file, clobber=True):

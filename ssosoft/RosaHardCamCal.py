@@ -1,12 +1,16 @@
 import astropy.io.fits as fits
 import configparser
 import glob
+import logging, logging.config
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import re
+import sys
 
 class RosaHardCamCal:
+	
+	from . import ssosoftConfig
 
 	def __init__(self, configFile): ## Later on, input a named instrument.
 		## Test to see if configFile exists.
@@ -15,6 +19,7 @@ class RosaHardCamCal:
 			f.close()
 		except FileNotFoundError as err:
 			print("File not found error: {0}".format(err))
+			raise
 		
 		self.avgDark=None
 		self.avgFlat=None
@@ -34,7 +39,6 @@ class RosaHardCamCal:
 		self.obsTime=""
 		self.preSpeckleBase=""
 
-		
 	def rosa_hardcam_average_image_from_list(self, fileList):
 		avgIm=np.zeros(self.imageShape, dtype=np.float32)
 		for file in fileList:
@@ -47,8 +51,14 @@ class RosaHardCamCal:
 		pass
 
 	def rosa_hardcam_configure_run(self):
+		def rosa_hardcam_assert_base_dirs(baseDir):
+			assert(os.path.isdir(baseDir)), (
+					"Directory does not exist: {0}".format(baseDir)
+					)
+
 		config=configparser.ConfigParser()
 		config.read(self.configFile)
+		
 		self.burstNumber=np.int(config['HARDCAM']['burstNumber'])
 		self.darkBase=config['HARDCAM']['darkBase']
 		self.dataBase=config['HARDCAM']['dataBase']
@@ -58,21 +68,59 @@ class RosaHardCamCal:
 		self.obsTime=config['HARDCAM']['obsTime']
 		self.preSpeckleBase=config['HARDCAM']['preSpeckleBase']
 
-		## darkBase, dataBase, and flatBase directories must exist.
-		if not os.path.isdir(self.darkBase):
-			raise FileNotFoundError(self.darkBase)
-		if not os.path.isdir(self.dataBase):
-			raise FileNotFoundError(self.dataBase)
-		if not os.path.isdir(self.flatBase):
-			raise FileNotFoundError(self.flatBase)
+		## Directory preSpeckleBase must exist or be created in order
+		## to continue.
+		if not os.path.isdir(self.preSpeckleBase):
+			print("{0}: os.mkdir: attempting to create directory:"
+					"{1}".format(__name__, self.preSpeckleBase)
+					)
+			try:
+				os.mkdir(self.preSpeckleBase)
+			except FileExistsError as err:
+				print("File exists error: {0}".format(err))
+				raise
+			except PermissionError as err:
+				print("Permission error: {0}".format(err))
+				raise
 
-		## If preSpeckleBase directory doesn't exist and is not a
-		## regular file, then create it.
-		if os.path.isfile(self.preSpeckleBase):
-			raise FileExistsError(self.preSpeckleBase)
-		elif not os.path.isdir(self.preSpeckleBase):
-			print('os.mkdir:', self.preSpeckleBase)
-			os.mkdir(self.preSpeckleBase)
+		## Set-up logging.
+		logging.config.fileConfig(self.configFile,
+				defaults={'logfilename':
+					'{0}/hardcam.log'.format(self.preSpeckleBase)
+					}
+				)
+		self.logger=logging.getLogger('HardcamLog')
+
+		## Print an intro message.
+		self.logger.info("This is SSOsoft version {0}".format(self.ssosoftConfig.__version__))
+		self.logger.info("Contact {0} to report bugs, make suggestions, "
+				"or contribute.".format(self.ssosoftConfig.__email__))
+		self.logger.info("Now configuring this {0} data calibration run.".format('HARDCAM'))
+
+		## darkBase, dataBase, and flatBase directories must exist.
+		try:
+			rosa_hardcam_assert_base_dirs(self.darkBase)
+		except AssertionError as err:
+			self.logger.critical("Fatal: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Using dark directory: {0}".format(self.darkBase))
+		
+		try:
+			rosa_hardcam_assert_base_dirs(self.dataBase)
+		except AssertionError as err:
+			self.logger.critical("Fatal: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Using data directory: {0}".format(self.dataBase))
+		
+		try:
+			rosa_hardcam_assert_base_dirs(self.flatBase)
+		except AssertionError as err:
+			self.logger.critical("Fatal: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Using flat directory: {0}".format(self.flatBase))
 
 	def rosa_hardcam_compute_gain(self):
 		darkSubtracted=self.avgFlat-self.avgDark
@@ -142,9 +190,46 @@ class RosaHardCamCal:
 		plt.show()
 
 	def rosa_hardcam_get_file_lists(self):
-		self.darkList=sorted(glob.glob(self.darkBase+self.filePattern))
-		self.dataList=sorted(glob.glob(self.dataBase+self.filePattern))
-		self.flatList=sorted(glob.glob(self.flatBase+self.filePattern))
+		def rosa_hardcam_assert_file_list(fList):
+			assert(len(fList)!=0), "List contains no matches."
+
+		self.logger.info("Searching for darks, flats, and data "
+				"ending with {0}".format(self.filePattern))
+		self.logger.info("Searching for dark image files: {0}".format(self.darkBase))
+		self.darkList=glob.glob(
+			os.path.join(self.darkBase, self.filePattern)
+			)
+		try:
+			rosa_hardcam_assert_file_list(self.darkList)
+		except AssertionError as err:
+			self.logger.critical("Error: darkList: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Files in darkList: {0}".format(len(self.darkList)))
+
+		self.logger.info("Searching for data image files: {0}".format(self.dataBase))
+		self.dataList=glob.glob(
+				os.path.join(self.dataBase, self.filePattern)
+				)
+		try:
+			rosa_hardcam_assert_file_list(self.dataList)
+		except AssertionError as err:
+			self.logger.critical("Error: dataList: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Files in dataList: {0}".format(len(self.dataList)))
+
+		self.logger.info("Searching for flat image files: {0}".format(self.flatBase))
+		self.flatList=glob.glob(
+				os.path.join(self.flatBase, self.filePattern)
+				)
+		try:
+			rosa_hardcam_assert_file_list(self.flatList)
+		except AssertionError as err:
+			self.logger.critical("Error: flatList: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Files in flatList: {0}".format(len(self.flatList)))
 
 	def rosa_hardcam_get_data_image_shapes(self, file):
 		imageFile=open(file, mode='rb')
@@ -172,18 +257,29 @@ class RosaHardCamCal:
 					digitNew=match.group()[::-1]
 					orderList[int(digitNew)]=f
 				else:
-					print("Invalid filename format for dark.")
-			return orderList
+					self.logger.error(
+							"Unexpected filename format: "
+							"{0}".format(f)
+							)
+			try:
+				assert(all(orderList)), "List could not be ordered."
+			except AssertionError as err:
+				self.logger.critical("Error: {0}".format(err))
+				raise
+			else:
+				return orderList
 
+		self.logger.info("Sorting darkList.")
 		self.darkList=rosa_hardcam_order_file_list(self.darkList)
+		self.logger.info("Sorting flatList.")
 		self.flatList=rosa_hardcam_order_file_list(self.flatList)
+		self.logger.info("Sorting dataList.")
 		self.dataList=rosa_hardcam_order_file_list(self.dataList)
 
 	def rosa_hardcam_run_calibration(self):
 		self.rosa_hardcam_configure_run()
 		self.rosa_hardcam_get_file_lists()
 		self.rosa_hardcam_order_files()
-		#self.rosa_hardcam_get_file_lists()
 		self.rosa_hardcam_get_data_image_shapes(self.flatList[0])
 		self.avgDark=self.rosa_hardcam_average_image_from_list(
 				self.darkList
@@ -230,11 +326,9 @@ class RosaHardCamCal:
 					(self.obsDate, self.obsTime, burstThsnds, burstHndrds)
 					)
 			## Save burstCube
-			#f=open(burstFile, mode='wb')
 			with open(burstFile, mode='wb') as f:
 				## Reverse axis order to save fortran-style.
 				burstCube.swapaxes(0,2).tofile(f)
-			#f.close()
 			burst+=1
 
 	def rosa_hardcam_save_fits_image(self, image, file, clobber=True):

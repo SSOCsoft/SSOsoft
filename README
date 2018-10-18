@@ -94,6 +94,10 @@ Using SSOsoft is easy.
 	class, where <config file> is a string containing the
 	location of the ini file created in the first step.
 	* Run the rosa_hardcam_run_calibration() method.
+	* Monitor the log file `hardcam.log' to see intermediate
+	reduction steps.
+	* Take a look at the average dark, average flat, gain, and
+	noise images output in FITS format.
 	* Have a look at other methods in the class if you would
 	like to customize your calibration run.
 

@@ -33,8 +33,10 @@ class RosaHardCamCal:
 		self.filePattern=""
 		self.flatBase=""
 		self.flatList=[""]
-		self.gain=[]
+		self.gain=None
 		self.imageShape=None
+		self.noise=None
+		self.noiseFile=""
 		self.obsDate=""
 		self.obsTime=""
 		self.preSpeckleBase=""
@@ -42,9 +44,8 @@ class RosaHardCamCal:
 	def rosa_hardcam_average_image_from_list(self, fileList):
 		def rosa_hardcam_print_average_image_progress():
 			if not fNum % 100:
-				self.logger.info("Progress: {:0.1%}.".format(
-							fNum/len(fileList)
-							)
+				self.logger.info("Progress: "
+						"{:0.1%}.".format(fNum/len(fileList))
 						)
 
 		self.logger.info("Computing average image from {0} files "
@@ -69,6 +70,46 @@ class RosaHardCamCal:
 	def rosa_hardcam_check_dark_data_flat_shapes(self):
 		pass
 
+	def rosa_hardcam_compute_gain(self):
+		self.logger.info("Computing gain table.")
+		darkSubtracted=self.avgFlat-self.avgDark
+		try:
+			self.gain=np.median(darkSubtracted)/(darkSubtracted)
+		except Exception as err:
+			self.error("Error computing gain table: "
+					"{0}".format(err)
+					)
+
+		self.logger.info("Gain table computed.")
+
+	def rosa_hardcam_compute_noise_file(self):
+		self.logger.info("Computing noise cube: shape: "
+				"{0}".format(self.imageShape+(self.burstNumber,))
+				)
+		self.noise=np.zeros((self.burstNumber,)+self.imageShape,
+				dtype=np.float32
+				)
+		i=0
+		for flat in self.flatList[0:self.burstNumber]:
+			self.noise[i, :, :]=(self.rosa_hardcam_read_binary_image(flat)
+					-self.avgDark)
+			i+=1
+		self.noise=np.multiply(self.noise, self.gain)
+		
+		self.logger.info("Noise cube complete. "
+				"Saving to noise file: "
+				"{0}".format(
+					os.path.join(self.preSpeckleBase, self.noiseFile)
+					)
+				)
+		self.rosa_hardcam_save_binary_image_cube(
+				self.noise,
+				os.path.join(self.preSpeckleBase, self.noiseFile)
+				)
+		self.logger.info("Saved noise file: "
+				"{0}".format(os.path.join(self.preSpeckleBase, self.noiseFile))
+				)
+	
 	def rosa_hardcam_configure_run(self):
 		def rosa_hardcam_assert_base_dirs(baseDir):
 			assert(os.path.isdir(baseDir)), (
@@ -83,6 +124,7 @@ class RosaHardCamCal:
 		self.dataBase=config['HARDCAM']['dataBase']
 		self.filePattern=config['HARDCAM']['filePattern']
 		self.flatBase=config['HARDCAM']['flatBase']
+		self.noiseFile=config['HARDCAM']['noiseFile']
 		self.obsDate=config['HARDCAM']['obsDate']
 		self.obsTime=config['HARDCAM']['obsTime']
 		self.preSpeckleBase=config['HARDCAM']['preSpeckleBase']
@@ -141,18 +183,6 @@ class RosaHardCamCal:
 		else:
 			self.logger.info("Using flat directory: {0}".format(self.flatBase))
 
-	def rosa_hardcam_compute_gain(self):
-		self.logger.info("Computing gain table.")
-		darkSubtracted=self.avgFlat-self.avgDark
-		try:
-			self.gain=np.median(darkSubtracted)/(darkSubtracted)
-		except Exception as err:
-			self.error("Error computing gain table: "
-					"{0}".format(err)
-					)
-
-		self.logger.info("Gain table computed.")
-	
 	def rosa_hardcam_detect_dims(self, imageData):
 		## Detects data then usable image dimensions.
 		## Assumes all overscan regions within the raw
@@ -311,7 +341,12 @@ class RosaHardCamCal:
 		self.logger.info("Sorting dataList.")
 		self.dataList=rosa_hardcam_order_file_list(self.dataList)
 
-	def rosa_hardcam_read_binary_image(self, file):
+	def rosa_hardcam_read_binary_image(self, file, dataShape=None, imageShape=None):
+		if dataShape is None:
+			dataShape=self.dataShape
+		if imageShape is None:
+			imageShape=self.imageShape
+
 		try:
 			with open(file, mode='rb') as imageFile:
 				imageData=np.fromfile(imageFile,
@@ -323,11 +358,16 @@ class RosaHardCamCal:
 					)
 			raise
 
-		im=imageData.reshape((self.dataShape))
-		im=im[0:self.imageShape[0], 0:self.imageShape[1]]
+		im=imageData.reshape((dataShape))
+		## Generate a tuple of slice objects, s[i]~ 0:imageShape[i]
+		s=tuple()
+		for t in imageShape:
+			s=s+np.index_exp[0:t]
+		im=im[s]
 		return np.float32(im)
 
 	def rosa_hardcam_run_calibration(self):
+		self.logger.info("Starting standard HARDCAM run.")
 		self.rosa_hardcam_configure_run()
 		self.rosa_hardcam_get_file_lists()
 		self.rosa_hardcam_order_files()
@@ -341,6 +381,15 @@ class RosaHardCamCal:
 		self.rosa_hardcam_compute_gain()
 		self.rosa_hardcam_save_cal_images()
 		self.rosa_hardcam_save_bursts()
+		self.logger.info("Finished standard HARDCAM run.")
+
+	def rosa_hardcam_save_binary_image_cube(self, data, file):
+		try:
+			with open(file, mode='wb') as f:
+				data.tofile(f)
+		except Exception as err:
+			self.logger.critical("Could not save binary file: {0}".format(err))
+			raise
 
 	def rosa_hardcam_save_bursts(self):
 		def rosa_hardcam_flatfield_correction():
@@ -357,7 +406,7 @@ class RosaHardCamCal:
 					)
 
 		lastBurst=np.int(len(self.dataList)/self.burstNumber)
-		burstShape=self.imageShape+(self.burstNumber,)
+		burstShape=(self.burstNumber,)+self.imageShape
 		self.logger.info("Preparing burst files, saving in directory: "
 				"{0}".format(self.preSpeckleBase)
 				)
@@ -372,7 +421,7 @@ class RosaHardCamCal:
 			burstList=self.dataList[burst*self.burstNumber:(burst+1)*self.burstNumber]
 			i=0
 			for file in burstList:
-				burstCube[:, :, i]=rosa_hardcam_flatfield_correction()
+				burstCube[i, :, :]=rosa_hardcam_flatfield_correction()
 				i+=1
 			## Construct filename.
 			burstThsnds=burst//1000
@@ -381,17 +430,24 @@ class RosaHardCamCal:
 					"%s_%s_kisip.raw.batch.%02d.%03d" %
 					(self.obsDate, self.obsTime, burstThsnds, burstHndrds)
 					)
-			## Save burstCube
-			try:
-				with open(burstFile, mode='wb') as f:
-					## Reverse axis order to save fortran-style.
-					burstCube.swapaxes(0,2).tofile(f)
-			except Exception as err:
-				self.logger.critical("Could not save burst file: {0}".format(err))
-				raise
-
+			### Save burstCube
+			#try:
+			#	with open(burstFile, mode='wb') as f:
+			#		## Reverse axis order to save fortran-style.
+			#		burstCube.swapaxes(0,2).tofile(f)
+			#except Exception as err:
+			#	self.logger.critical("Could not save burst file: {0}".format(err))
+			#	raise
+			#else:
+			#	rosa_hardcam_print_progress_save_bursts()
+			#	burst+=1
+			self.rosa_hardcam_save_binary_image_cube(
+					burstCube,#.swapaxes(0,2), 
+					burstFile
+					)
 			rosa_hardcam_print_progress_save_bursts()
 			burst+=1
+
 		self.logger.info("Burst files complete: {0}".format(self.preSpeckleBase))
 
 	def rosa_hardcam_save_cal_images(self):
@@ -403,6 +459,7 @@ class RosaHardCamCal:
 		self.rosa_hardcam_save_fits_image(self.avgDark,
 				os.path.join(self.preSpeckleBase, 'Halpha_dark.fits')
 				)
+
 		self.logger.info("Saving average flat: "
 				"{0}".format(
 					os.path.join(self.preSpeckleBase, 'Halpha_flat.fits')
@@ -411,6 +468,7 @@ class RosaHardCamCal:
 		self.rosa_hardcam_save_fits_image(self.avgFlat,
 				os.path.join(self.preSpeckleBase, 'Halpha_flat.fits')
 				)
+
 		self.logger.info("Saving gain: "
 				"{0}".format(
 					os.path.join(self.preSpeckleBase, 'Halpha_gain.fits')
@@ -419,6 +477,16 @@ class RosaHardCamCal:
 		self.rosa_hardcam_save_fits_image(self.gain,
 				os.path.join(self.preSpeckleBase, 'Halpha_gain.fits')
 				)
+
+		self.logger.info("Saving noise: "
+				"{0}".format(
+					os.path.join(self.preSpeckleBase, 'Halpha_noise.fits')
+					)
+				)
+		self.rosa_hardcam_save_fits_image(self.noise,
+				os.path.join(self.preSpeckleBase, 'Halpha_noise.fits')
+				)
+
 
 	def rosa_hardcam_save_fits_image(self, image, file, clobber=True):
 		hdu=fits.PrimaryHDU(image)

@@ -42,11 +42,8 @@ F. Woeger, National Solar Observatory).
 To do
 -----
 	
-	* Develop tests for file I/O opterations and data
-	descriptors.
 	* Develop a test for the integrity of automatic image shape
 	detection results.
-	* Include logging features.
 	* Implement seamless end-to-end calibration by developing
 	a container class for running KISIP.
 	* Generalize tools to allow SSOsoft to be able to reduce
@@ -72,9 +69,11 @@ harder.
 	* Friedrich Weoger, National Solar Observatory.
 
 
-Software requirements
----------------------
+Software and Hardware Requirements
+----------------------------------
 
+Linux Operating System
+Intel/AMD CPU
 Python 3.x
 Matplotlib
 NumPy

@@ -11,14 +11,14 @@ import sys
 class RosaHardCamCal:
 	
 	from . import ssosoftConfig
-
-	def __init__(self, configFile): ## Later on, input a named instrument.
+	
+	def __init__(self, instrument, configFile):
 		## Test to see if configFile exists.
 		try:
 			f=open(configFile, mode='r')
 			f.close()
-		except FileNotFoundError as err:
-			print("File not found error: {0}".format(err))
+		except Exception as err:
+			print("Exception: {0}".format(err))
 			raise
 		
 		self.avgDark=None
@@ -35,11 +35,14 @@ class RosaHardCamCal:
 		self.flatList=[""]
 		self.gain=None
 		self.imageShape=None
+		self.instrument=instrument.upper()
+		self.logFile=""
 		self.noise=None
 		self.noiseFile=""
 		self.obsDate=""
 		self.obsTime=""
 		self.preSpeckleBase=""
+		self.workBase=""
 
 	def rosa_hardcam_average_image_from_list(self, fileList):
 		def rosa_hardcam_print_average_image_progress():
@@ -119,15 +122,18 @@ class RosaHardCamCal:
 		config=configparser.ConfigParser()
 		config.read(self.configFile)
 		
-		self.burstNumber=np.int(config['HARDCAM']['burstNumber'])
-		self.darkBase=config['HARDCAM']['darkBase']
-		self.dataBase=config['HARDCAM']['dataBase']
-		self.filePattern=config['HARDCAM']['filePattern']
-		self.flatBase=config['HARDCAM']['flatBase']
-		self.noiseFile=config['HARDCAM']['noiseFile']
-		self.obsDate=config['HARDCAM']['obsDate']
-		self.obsTime=config['HARDCAM']['obsTime']
-		self.preSpeckleBase=config['HARDCAM']['preSpeckleBase']
+		self.burstNumber=np.int(config[self.instrument]['burstNumber'])
+		self.burstFileForm=config[self.instrument]['burstFileForm']
+		self.darkBase=config[self.instrument]['darkBase']
+		self.dataBase=config[self.instrument]['dataBase']
+		self.filePattern=config[self.instrument]['filePattern']
+		self.flatBase=config[self.instrument]['flatBase']
+		self.noiseFile=config[self.instrument]['noiseFile']
+		self.obsDate=config[self.instrument]['obsDate']
+		self.obsTime=config[self.instrument]['obsTime']
+		self.workBase=config[self.instrument]['workBase']
+
+		self.preSpeckleBase=os.path.join(self.workBase, 'preSpeckle')
 
 		## Directory preSpeckleBase must exist or be created in order
 		## to continue.
@@ -145,18 +151,20 @@ class RosaHardCamCal:
 				raise
 
 		## Set-up logging.
-		logging.config.fileConfig(self.configFile,
-				defaults={'logfilename':
-					'{0}/hardcam.log'.format(self.preSpeckleBase)
-					}
+		self.logFile='{0}{1}'.format(
+				os.path.join(self.workBase, self.instrument.lower()),
+				'.log'
 				)
-		self.logger=logging.getLogger('HardcamLog')
+		logging.config.fileConfig(self.configFile,
+				defaults={'logfilename': self.logFile}
+				)
+		self.logger=logging.getLogger('{0}Log'.format(self.instrument.lower()))
 
 		## Print an intro message.
 		self.logger.info("This is SSOsoft version {0}".format(self.ssosoftConfig.__version__))
 		self.logger.info("Contact {0} to report bugs, make suggestions, "
 				"or contribute.".format(self.ssosoftConfig.__email__))
-		self.logger.info("Now configuring this {0} data calibration run.".format('HARDCAM'))
+		self.logger.info("Now configuring this {0} data calibration run.".format(self.instrument))
 
 		## darkBase, dataBase, and flatBase directories must exist.
 		try:
@@ -405,7 +413,7 @@ class RosaHardCamCal:
 						)
 					)
 
-		lastBurst=np.int(len(self.dataList)/self.burstNumber)
+		lastBurst=len(self.dataList)//self.burstNumber
 		burstShape=(self.burstNumber,)+self.imageShape
 		self.logger.info("Preparing burst files, saving in directory: "
 				"{0}".format(self.preSpeckleBase)
@@ -426,23 +434,14 @@ class RosaHardCamCal:
 			## Construct filename.
 			burstThsnds=burst//1000
 			burstHndrds=burst%1000
-			burstFile=os.path.join(self.preSpeckleBase,
-					"%s_%s_kisip.raw.batch.%02d.%03d" %
-					(self.obsDate, self.obsTime, burstThsnds, burstHndrds)
+			burstFile=os.path.join(
+					self.preSpeckleBase,
+					(self.burstFileForm).format(
+						self.obsDate, self.obsTime, burstThsnds, burstHndrds
+						)
 					)
-			### Save burstCube
-			#try:
-			#	with open(burstFile, mode='wb') as f:
-			#		## Reverse axis order to save fortran-style.
-			#		burstCube.swapaxes(0,2).tofile(f)
-			#except Exception as err:
-			#	self.logger.critical("Could not save burst file: {0}".format(err))
-			#	raise
-			#else:
-			#	rosa_hardcam_print_progress_save_bursts()
-			#	burst+=1
 			self.rosa_hardcam_save_binary_image_cube(
-					burstCube,#.swapaxes(0,2), 
+					burstCube, 
 					burstFile
 					)
 			rosa_hardcam_print_progress_save_bursts()
@@ -453,38 +452,62 @@ class RosaHardCamCal:
 	def rosa_hardcam_save_cal_images(self):
 		self.logger.info("Saving average dark: "
 				"{0}".format(
-					os.path.join(self.preSpeckleBase, 'Halpha_dark.fits')
+					os.path.join(
+						self.workBase,
+						'{0}_dark.fits'.format(self.instrument)
+						)
 					)
 				)
 		self.rosa_hardcam_save_fits_image(self.avgDark,
-				os.path.join(self.preSpeckleBase, 'Halpha_dark.fits')
+				os.path.join(
+					self.workBase,
+					'{0}_dark.fits'.format(self.instrument)
+					)
 				)
 
 		self.logger.info("Saving average flat: "
 				"{0}".format(
-					os.path.join(self.preSpeckleBase, 'Halpha_flat.fits')
+					os.path.join(
+						self.workBase,
+						'{0}_flat.fits'.format(self.instrument)
+						)
 					)
 				)
 		self.rosa_hardcam_save_fits_image(self.avgFlat,
-				os.path.join(self.preSpeckleBase, 'Halpha_flat.fits')
+				os.path.join(
+					self.workBase,
+					'{0}_flat.fits'.format(self.instrument)
+					)
 				)
 
 		self.logger.info("Saving gain: "
 				"{0}".format(
-					os.path.join(self.preSpeckleBase, 'Halpha_gain.fits')
+					os.path.join(
+						self.workBase,
+						'{0}_gain.fits'.format(self.instrument)
+						)
 					)
 				)
 		self.rosa_hardcam_save_fits_image(self.gain,
-				os.path.join(self.preSpeckleBase, 'Halpha_gain.fits')
+				os.path.join(
+					self.workBase,
+					'{0}_gain.fits'.format(self.instrument)
+					)
 				)
 
 		self.logger.info("Saving noise: "
 				"{0}".format(
-					os.path.join(self.preSpeckleBase, 'Halpha_noise.fits')
+					os.path.join(
+						self.workBase,
+						'{0}_noise.fits'.format(self.instrument)
+						)
 					)
 				)
 		self.rosa_hardcam_save_fits_image(self.noise,
-				os.path.join(self.preSpeckleBase, 'Halpha_noise.fits')
+				os.path.join(
+					self.workBase,
+					'{0}_noise.fits'.format(self.instrument)
+					)
 				)
 
 

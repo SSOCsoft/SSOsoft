@@ -23,6 +23,7 @@ class RosaHardCamCal:
 		
 		self.avgDark=None
 		self.avgFlat=None
+		self.batchList=[]
 		self.burstNumber=0
 		self.configFile=configFile
 		self.darkBase=""
@@ -131,24 +132,25 @@ class RosaHardCamCal:
 		self.noiseFile=config[self.instrument]['noiseFile']
 		self.obsDate=config[self.instrument]['obsDate']
 		self.obsTime=config[self.instrument]['obsTime']
+		self.speckledFileForm=config[self.instrument]['speckledFileForm']
 		self.workBase=config[self.instrument]['workBase']
 
 		self.preSpeckleBase=os.path.join(self.workBase, 'preSpeckle')
+		self.speckleBase=os.path.join(self.workBase, 'speckle')
+		self.postSpeckleBase=os.path.join(self.workBase, 'postSpeckle')
 
-		## Directory preSpeckleBase must exist or be created in order
-		## to continue.
-		if not os.path.isdir(self.preSpeckleBase):
-			print("{0}: os.mkdir: attempting to create directory:"
-					"{1}".format(__name__, self.preSpeckleBase)
-					)
-			try:
-				os.mkdir(self.preSpeckleBase)
-			except FileExistsError as err:
-				print("File exists error: {0}".format(err))
-				raise
-			except PermissionError as err:
-				print("Permission error: {0}".format(err))
-				raise
+		## Directories preSpeckleBase, speckleBase, and postSpeckle
+		## must exist or be created in order to continue.
+		for dirBase in [self.preSpeckleBase, self.speckleBase, self.postSpeckleBase]:
+			if not os.path.isdir(dirBase):
+				print("{0}: os.mkdir: attempting to create directory:"
+						"{1}".format(__name__, dirBase)
+						)
+				try:
+					os.mkdir(dirBase)
+				except Exception as err:
+					print("An exception was raised: {0}".format(err))
+					raise
 
 		## Set-up logging.
 		self.logFile='{0}{1}'.format(
@@ -375,8 +377,8 @@ class RosaHardCamCal:
 		return np.float32(im)
 
 	def rosa_hardcam_run_calibration(self):
-		self.logger.info("Starting standard HARDCAM run.")
 		self.rosa_hardcam_configure_run()
+		self.logger.info("Starting standard HARDCAM calibration.")
 		self.rosa_hardcam_get_file_lists()
 		self.rosa_hardcam_order_files()
 		self.rosa_hardcam_get_data_image_shapes(self.flatList[0])
@@ -389,7 +391,7 @@ class RosaHardCamCal:
 		self.rosa_hardcam_compute_gain()
 		self.rosa_hardcam_save_cal_images()
 		self.rosa_hardcam_save_bursts()
-		self.logger.info("Finished standard HARDCAM run.")
+		self.logger.info("Finished standard HARDCAM calibration.")
 
 	def rosa_hardcam_save_binary_image_cube(self, data, file):
 		try:
@@ -425,13 +427,14 @@ class RosaHardCamCal:
 				)
 		burstCube=np.zeros(burstShape, dtype=np.float32)
 		burst=0
+		batch=-1
 		while burst < lastBurst:
 			burstList=self.dataList[burst*self.burstNumber:(burst+1)*self.burstNumber]
 			i=0
 			for file in burstList:
 				burstCube[i, :, :]=rosa_hardcam_flatfield_correction()
 				i+=1
-			## Construct filename.
+			## Construct filename, KISIP takes batches of 1000 or less.
 			burstThsnds=burst//1000
 			burstHndrds=burst%1000
 			burstFile=os.path.join(
@@ -445,6 +448,10 @@ class RosaHardCamCal:
 					burstFile
 					)
 			rosa_hardcam_print_progress_save_bursts()
+			## Add burstThsnds to batchList if needed.
+			if burstThsnds != batch:
+				batch=burstThsnds
+				(self.batchList).append(batch)
 			burst+=1
 
 		self.logger.info("Burst files complete: {0}".format(self.preSpeckleBase))
@@ -510,6 +517,44 @@ class RosaHardCamCal:
 					)
 				)
 
+	def rosa_hardcam_save_despeckled_as_fits(self):
+		self.logger.info("Saving despeckled binary image files to FITS.")
+		self.logger.info("Searching for files: "
+				"{0}".format(
+					os.path.join(self.speckleBase,
+						self.speckledFileForm.format(
+							self.obsDate, self.obsTime, 0, 0
+							)[:-7]+'*.final'
+						)
+					)
+				)
+		fList=glob.glob(os.path.join(self.speckleBase, 
+			self.speckledFileForm.format(
+				self.obsDate, self.obsTime, 0, 0
+				)[:-7]+'*.final'
+			)
+			)
+		try:
+			assert(len(fList) != 0)
+		except Exception as err:
+			self.logger.critical("CRITICAL: no files found: {0}".format(err))
+			raise
+		else:
+			self.logger.info("Found {0} files.".format(len(fList)))
+		for file in fList:
+			im=self.rosa_hardcam_read_binary_image(file,
+					imageShape=self.imageShape[::-1]+(2,),
+					dataShape=self.imageShape[::-1]+(2,)
+					) ## KISIP saves with Fortran ordering.
+			fName=os.path.basename(file)
+			self.rosa_hardcam_save_fits_image(im[:, :, 1],
+					os.path.join(
+						self.postSpeckleBase,
+						fName+'.fits'
+						)
+					)
+		self.logger.info("Finished saving despeckled images as FITS"
+				"in directory: {0}".format(self.postSpeckleBase))
 
 	def rosa_hardcam_save_fits_image(self, image, file, clobber=True):
 		hdu=fits.PrimaryHDU(image)

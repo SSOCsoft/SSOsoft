@@ -1,8 +1,10 @@
-"""Config file for SSOsoft"""
+"""
+Config file for SSOsoft
+"""
 
 __author__="""Gordon A. MacDonald"""
 __email__='gordonm@nmsu.edu'
-__version__='0.1.0'
+__version__='0.1.1'
 
 idlPath="idl"
 instrList=["IBIS", "FIRS", "SPINOR",

@@ -50,6 +50,15 @@ To do
 	ROSA data.
 
 
+Known Bugs
+----------
+
+	* Noise file always written even if no noise file is
+	computed.
+	* After setting up logging for kisipWrapper, logging
+	for RosaHardCamCal is disabled.
+
+
 Future
 ------
 

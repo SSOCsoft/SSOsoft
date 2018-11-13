@@ -138,6 +138,10 @@ class RosaHardCamCal:
 		self.preSpeckleBase=os.path.join(self.workBase, 'preSpeckle')
 		self.speckleBase=os.path.join(self.workBase, 'speckle')
 		self.postSpeckleBase=os.path.join(self.workBase, 'postSpeckle')
+		self.darkFile=os.path.join(self.workBase, '{0}_dark.fits'.format(self.instrument))
+		self.flatFile=os.path.join(self.workBase, '{0}_flat.fits'.format(self.instrument))
+		self.gainFile=os.path.join(self.workBase, '{0}_gain.fits'.format(self.instrument))
+		self.noiseFileFits=os.path.join(self.workBase, '{0}_noise'.format(self.instrument))
 
 		## Directories preSpeckleBase, speckleBase, and postSpeckle
 		## must exist or be created in order to continue.
@@ -154,7 +158,9 @@ class RosaHardCamCal:
 
 		## Set-up logging.
 		self.logFile='{0}{1}'.format(
-				os.path.join(self.workBase, self.instrument.lower()),
+				os.path.join(self.workBase,
+					'{0}_{1}'.format(self.obsTime, self.instrument.lower())
+					),
 				'.log'
 				)
 		logging.config.fileConfig(self.configFile,
@@ -261,6 +267,34 @@ class RosaHardCamCal:
 				cmap='hot'
 				)
 		plt.show()
+
+	def rosa_hardcam_get_cal_images(self):
+		if os.path.exists(self.darkFile):
+			self.logger.info("Average dark file found: {0}".format(self.darkFile))
+			self.logger.info("Reading average dark.")
+			with fits.open(self.darkFile) as hdu:
+				self.avgDark=hdu[0].data
+		else:
+			self.avgDark=self.rosa_hardcam_average_image_from_list(
+					self.darkList
+					)
+		if os.path.exists(self.flatFile):
+			self.logger.info("Average flat file found: {0}".format(self.flatFile))
+			self.logger.info("Reading average flat.")
+			with fits.open(self.flatFile) as hdu:
+				self.avgFlat=hdu[0].data
+		else:
+			self.avgFlat=self.rosa_hardcam_average_image_from_list(
+					self.flatList
+					)
+		if os.path.exists(self.gainFile):
+			self.logger.info("Gain file found: {0}".format(self.gainFile))
+			self.logger.info("Reading gain file.")
+			with fits.open(self.gainFile) as hdu:
+				self.gain=hdu[0].data
+		else:
+			self.rosa_hardcam_compute_gain()
+
 
 	def rosa_hardcam_get_file_lists(self):
 		def rosa_hardcam_assert_file_list(fList):
@@ -382,13 +416,7 @@ class RosaHardCamCal:
 		self.rosa_hardcam_get_file_lists()
 		self.rosa_hardcam_order_files()
 		self.rosa_hardcam_get_data_image_shapes(self.flatList[0])
-		self.avgDark=self.rosa_hardcam_average_image_from_list(
-				self.darkList
-				)
-		self.avgFlat=self.rosa_hardcam_average_image_from_list(
-				self.flatList
-				)
-		self.rosa_hardcam_compute_gain()
+		self.rosa_hardcam_get_cal_images()
 		self.rosa_hardcam_save_cal_images()
 		self.rosa_hardcam_save_bursts()
 		self.logger.info("Finished standard HARDCAM calibration.")
@@ -419,6 +447,9 @@ class RosaHardCamCal:
 		burstShape=(self.burstNumber,)+self.imageShape
 		self.logger.info("Preparing burst files, saving in directory: "
 				"{0}".format(self.preSpeckleBase)
+				)
+		self.logger.info("Number of files to be saved: "
+				"{0}".format(len(self.dataList))
 				)
 		self.logger.info("Flat-fielding and saving data to burst files "
 				"with burst number: {0}: shape: {1}".format(
@@ -457,65 +488,74 @@ class RosaHardCamCal:
 		self.logger.info("Burst files complete: {0}".format(self.preSpeckleBase))
 
 	def rosa_hardcam_save_cal_images(self):
-		self.logger.info("Saving average dark: "
-				"{0}".format(
-					os.path.join(
-						self.workBase,
-						'{0}_dark.fits'.format(self.instrument)
+		if os.path.exists(self.darkFile):
+			self.logger.info("Dark file already exists: {}".format(self.darkFile))
+		else:
+			self.logger.info("Saving average dark: "
+					"{0}".format(
+						os.path.join(
+							self.workBase,
+							self.darkFile
+							)
 						)
 					)
-				)
-		self.rosa_hardcam_save_fits_image(self.avgDark,
-				os.path.join(
-					self.workBase,
-					'{0}_dark.fits'.format(self.instrument)
-					)
-				)
-
-		self.logger.info("Saving average flat: "
-				"{0}".format(
+			self.rosa_hardcam_save_fits_image(self.avgDark,
 					os.path.join(
 						self.workBase,
-						'{0}_flat.fits'.format(self.instrument)
+						self.darkFile
 						)
 					)
-				)
-		self.rosa_hardcam_save_fits_image(self.avgFlat,
-				os.path.join(
-					self.workBase,
-					'{0}_flat.fits'.format(self.instrument)
+		if os.path.exists(self.flatFile):
+			self.logger.info("Flat file already exists: {0}".format(self.flatFile))
+		else:
+			self.logger.info("Saving average flat: "
+					"{0}".format(
+						os.path.join(
+							self.workBase,
+							self.flatFile
+							)
+						)
 					)
-				)
-
-		self.logger.info("Saving gain: "
-				"{0}".format(
+			self.rosa_hardcam_save_fits_image(self.avgFlat,
 					os.path.join(
 						self.workBase,
-						'{0}_gain.fits'.format(self.instrument)
+						self.flatFile
 						)
 					)
-				)
-		self.rosa_hardcam_save_fits_image(self.gain,
-				os.path.join(
-					self.workBase,
-					'{0}_gain.fits'.format(self.instrument)
+		if os.path.exists(self.gainFile):
+			self.logger.info("Gain file already exists: {0}".format(self.gainFile))
+		else:
+			self.logger.info("Saving gain: "
+					"{0}".format(
+						os.path.join(
+							self.workBase,
+							self.gainFile
+							)
+						)
 					)
-				)
-
-		self.logger.info("Saving noise: "
-				"{0}".format(
+			self.rosa_hardcam_save_fits_image(self.gain,
 					os.path.join(
 						self.workBase,
-						'{0}_noise.fits'.format(self.instrument)
+						self.gainFile
 						)
 					)
-				)
-		self.rosa_hardcam_save_fits_image(self.noise,
-				os.path.join(
-					self.workBase,
-					'{0}_noise.fits'.format(self.instrument)
+		if os.path.exists(self.noiseFileFits):
+			self.logger.info("Noise FITS file already exists: {0}".format(self.noiseFileFits))
+		else:
+			self.logger.info("Saving noise: "
+					"{0}".format(
+						os.path.join(
+							self.workBase,
+							self.noiseFileFits
+							)
+						)
 					)
-				)
+			self.rosa_hardcam_save_fits_image(self.noise,
+					os.path.join(
+						self.workBase,
+						self.noiseFileFits
+						)
+					)
 
 	def rosa_hardcam_save_despeckled_as_fits(self):
 		self.logger.info("Saving despeckled binary image files to FITS.")

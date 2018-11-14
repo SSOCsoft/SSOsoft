@@ -141,7 +141,7 @@ class RosaHardCamCal:
 		self.darkFile=os.path.join(self.workBase, '{0}_dark.fits'.format(self.instrument))
 		self.flatFile=os.path.join(self.workBase, '{0}_flat.fits'.format(self.instrument))
 		self.gainFile=os.path.join(self.workBase, '{0}_gain.fits'.format(self.instrument))
-		self.noiseFileFits=os.path.join(self.workBase, '{0}_noise'.format(self.instrument))
+		self.noiseFileFits=os.path.join(self.workBase, '{0}_noise.fits'.format(self.instrument))
 
 		## Directories preSpeckleBase, speckleBase, and postSpeckle
 		## must exist or be created in order to continue.

@@ -1,8 +1,8 @@
 """
 This is a wrapper library for running KISIP with
-regular Rosa/Hardcam data reduction runs.
+regular Rosa/Zyla data reduction runs.
 
-Initialize with an instance of RosaHardCamCal class.
+Initialize with an instance of RosaZylaCal class.
 """
 import configparser
 import glob
@@ -24,7 +24,7 @@ class kisipWrapper:
 		self.kisipPreSpeckleBatch=0
 		self.kisipPreSpeckleStartInd=0
 		self.kisipPreSpeckleEndInd=0
-		self.logFile=RHCC.logFile
+		#self.logFile=RHCC.logFile
 		self.noiseFile=RHCC.noiseFile
 		self.obsDate=RHCC.obsDate
 		self.obsTime=RHCC.obsTime
@@ -32,6 +32,14 @@ class kisipWrapper:
 		self.preSpeckleBase=RHCC.preSpeckleBase
 		self.speckleBase=RHCC.speckleBase
 		self.workBase=RHCC.workBase
+
+		self.logFile=os.path.join(
+				self.workBase,
+				'{0}_{1}_kisip.log'.format(
+					RHCC.obsTime,
+					RHCC.instrument.lower()
+					)
+				)
 	
 	def kisip_configure_run(self):
 		config=configparser.ConfigParser()
@@ -77,7 +85,7 @@ class kisipWrapper:
 				)
 		self.logger.info(
 				"kisipWrapper is designed to be used in conjunction with "
-				"the SSOsoft RosaHardCamCal class. Any other way of using "
+				"the SSOsoft RosaZylaCal class. Any other way of using "
 				"this package is at the user's risk."
 				)
 		self.logger.info("Now configuring this KISIP run.")
@@ -104,6 +112,7 @@ class kisipWrapper:
 				raise
 
 	def kisip_despeckle_all_batches(self):
+		self.kisip_configure_run()
 		self.logger.info("Preparing to run KISIP on batches: "
 				"{0}".format(self.batchList)
 				)

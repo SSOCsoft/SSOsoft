@@ -23,10 +23,10 @@ Features
 --------
 
 SSOsoft is a simple-to-use python class to calibrate
-and prepare ROSA and HaRDcam data from the Sunspot Solar
+and prepare ROSA and Zyla data from the Sunspot Solar
 Observatory. The full ROSA functionality is not yet
 supported. SSOsoft is able to produce all of the necessary
-HaRDcam image bursts for speckle analysis with the
+Zyla image bursts for speckle analysis with the
 Kiepenheuer-Institut Speckle Interferometry Package (KISIP,
 F. Woeger, National Solar Observatory).
 
@@ -56,7 +56,7 @@ Known Bugs
 	* Noise file always written even if no noise file is
 	computed.
 	* After setting up logging for kisipWrapper, logging
-	for RosaHardCamCal is disabled.
+	for RosaZylaCal is disabled.
 
 
 Future
@@ -98,11 +98,11 @@ Using SSOsoft is easy.
 	included sample for reference).
 	* Open a python terminal.
 	* import ssosoft
-	* Create an instance of the RosaHardCamCal(<config file>)
+	* Create an instance of the RosaZylaCal(<config file>)
 	class, where <config file> is a string containing the
 	location of the ini file created in the first step.
-	* Run the rosa_hardcam_run_calibration() method.
-	* Monitor the log file `hardcam.log' to see intermediate
+	* Run the rosa_zyla_run_zyla_calibration() method.
+	* Monitor the log file `<time>_zyla.log' to see intermediate
 	reduction steps.
 	* Take a look at the average dark, average flat, gain, and
 	noise images output in FITS format.

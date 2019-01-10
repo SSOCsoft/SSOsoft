@@ -13,7 +13,16 @@ class rosaZylaCal:
 	from . import ssosoftConfig
 	
 	def __init__(self, instrument, configFile):
-		## Test to see if configFile exists.
+		try:
+			assert(instrument.upper() in ['ZYLA', 'ROSA_3500',
+				'ROSA_4170', 'ROSA_CAK', 'ROSA_GBAND']
+				), ('Allowed values for <instrument>: '
+					'ZYLA, ROSA_3500, ROSA_4170, '
+					'ROSA_CAK', 'ROSA_GBAND'
+					)
+		except Exception as err:
+			print("Exception {0}".format(err))
+			raise
 		try:
 			f=open(configFile, mode='r')
 			f.close()
@@ -31,7 +40,9 @@ class rosaZylaCal:
 		self.dataBase=""
 		self.dataList=[""]
 		self.dataShape=None
-		self.filePattern=""
+		self.darkFilePattern=""
+		self.dataFilePattern=""
+		self.flatFilePattern=""
 		self.flatBase=""
 		self.flatList=[""]
 		self.gain=None
@@ -127,7 +138,9 @@ class rosaZylaCal:
 		self.burstFileForm=config[self.instrument]['burstFileForm']
 		self.darkBase=config[self.instrument]['darkBase']
 		self.dataBase=config[self.instrument]['dataBase']
-		self.filePattern=config[self.instrument]['filePattern']
+		self.darkFilePattern=config[self.instrument]['darkFilePattern']
+		self.dataFilePattern=config[self.instrument]['dataFilePattern']
+		self.flatFilePattern=config[self.instrument]['flatFilePattern']
 		self.flatBase=config[self.instrument]['flatBase']
 		self.noiseFile=config[self.instrument]['noiseFile']
 		self.obsDate=config[self.instrument]['obsDate']
@@ -300,11 +313,10 @@ class rosaZylaCal:
 		def rosa_zyla_assert_file_list(fList):
 			assert(len(fList)!=0), "List contains no matches."
 
-		self.logger.info("Searching for darks, flats, and data "
-				"ending with {0}".format(self.filePattern))
+		self.logger.info("Searching for darks, flats, and data files.")
 		self.logger.info("Searching for dark image files: {0}".format(self.darkBase))
 		self.darkList=glob.glob(
-			os.path.join(self.darkBase, self.filePattern)
+			os.path.join(self.darkBase, self.darkFilePattern)
 			)
 		try:
 			rosa_zyla_assert_file_list(self.darkList)
@@ -316,7 +328,7 @@ class rosaZylaCal:
 
 		self.logger.info("Searching for data image files: {0}".format(self.dataBase))
 		self.dataList=glob.glob(
-				os.path.join(self.dataBase, self.filePattern)
+				os.path.join(self.dataBase, self.dataFilePattern)
 				)
 		try:
 			rosa_zyla_assert_file_list(self.dataList)
@@ -328,7 +340,7 @@ class rosaZylaCal:
 
 		self.logger.info("Searching for flat image files: {0}".format(self.flatBase))
 		self.flatList=glob.glob(
-				os.path.join(self.flatBase, self.filePattern)
+				os.path.join(self.flatBase, self.flatFilePattern)
 				)
 		try:
 			rosa_zyla_assert_file_list(self.flatList)

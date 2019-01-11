@@ -71,11 +71,16 @@ class rosaZylaCal:
 		avgIm=np.zeros(self.imageShape, dtype=np.float32)
 		fNum=0
 		for file in fileList:
-			## Read-in image files, add them up.
-			avgIm=avgIm+self.rosa_zyla_read_binary_image(file)
+			if 'ZYLA' in self.instrument:
+				avgIm=avgIm+self.rosa_zyla_read_binary_image(file)
+				fNum+=1
+			if 'ROSA' in self.instrument:
+				with fits.open(file) as hdu:
+					for ext in hdu[1:]:
+						avgIm=avgIm+ext.data
+						fNum+=1
 			rosa_zyla_print_average_image_progress()
-			fNum+=1
-		avgIm=avgIm/len(fileList)
+		avgIm=avgIm/fNum
 
 		self.logger.info("Average complete, directory: "
 				"{0}".format(os.path.dirname(fileList[0]))
@@ -212,7 +217,16 @@ class rosaZylaCal:
 		else:
 			self.logger.info("Using flat directory: {0}".format(self.flatBase))
 
-	def rosa_zyla_detect_dims(self, imageData):
+	def rosa_zyla_detect_rosa_dims(self, header):
+		try:
+			self.dataShape=(header['NAXIS2'], header['NAXIS1'])
+			self.imageShape=(header['NAXIS2'], header['NAXIS1'])
+		except Exception as err:
+			self.logger.critical("Could not read from FITS header: "
+					"{0}".format(err)
+					)
+
+	def rosa_zyla_detect_zyla_dims(self, imageData):
 		## Detects data then usable image dimensions.
 		## Assumes all overscan regions within the raw
 		## image has a zero value. If no overscan,
@@ -352,36 +366,52 @@ class rosaZylaCal:
 
 	def rosa_zyla_get_data_image_shapes(self, file):
 		self.logger.info("Detecting image and data dimensions in "
-				"binary file: {0}".format(file)
+				"file: {0}".format(file)
 				)
-		try:
-			with open(file, mode='rb') as imageFile:
-				imageData=np.fromfile(imageFile,
-						dtype=np.uint16
+		if 'ZYLA' in self.instrument:
+			try:
+				with open(file, mode='rb') as imageFile:
+					imageData=np.fromfile(imageFile,
+							dtype=np.uint16
+							)
+			except Exception as err:
+				self.logger.critical("Could not get image or data "
+						"shapes: {0}".format(err)
 						)
-		except Exception as err:
-			self.logger.critical("Could not get image or data "
-					"shapes: {0}".format(err)
-					)
-			raise
-		self.rosa_zyla_detect_dims(imageData)
+				raise
+			self.rosa_zyla_detect_zyla_dims(imageData)
+		if 'ROSA' in self.instrument:
+			try:
+				with fits.open(file) as hdu:
+					header=hdu[1].header
+			except Exception as err:
+				self.logger.critical("Could not get image or data "
+						"shapes: {0}".format(err)
+						)
+				raise
+			self.rosa_zyla_detect_rosa_dims(header)
+
 
 	def rosa_zyla_order_files(self):
 		def rosa_zyla_order_file_list(fList):
-			orderList=['']*len(fList) ## List length same as fList
-			ptrn='[0-9]+'	#Match any digit one or more times.
-			p=re.compile(ptrn)
-			for f in fList:
-				head, tail=os.path.split(f)
-				match=p.match(tail)
-				if match:
-					digitNew=match.group()[::-1]
-					orderList[int(digitNew)]=f
-				else:
-					self.logger.error(
-							"Unexpected filename format: "
-							"{0}".format(f)
-							)
+			if 'ZYLA' in self.instrument:
+				orderList=['']*len(fList) ## List length same as fList
+				ptrn='[0-9]+'	#Match any digit one or more times.
+				p=re.compile(ptrn)
+				for f in fList:
+					head, tail=os.path.split(f)
+					match=p.match(tail)
+					if match:
+						digitNew=match.group()[::-1]
+						orderList[int(digitNew)]=f
+					else:
+						self.logger.error(
+								"Unexpected filename format: "
+								"{0}".format(f)
+								)
+			if 'ROSA' in self.instrument:
+				fList.sort()
+				orderList=fList
 			try:
 				assert(all(orderList)), "List could not be ordered."
 			except AssertionError as err:

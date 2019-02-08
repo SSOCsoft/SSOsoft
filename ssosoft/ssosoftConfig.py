@@ -4,7 +4,7 @@ Config file for SSOsoft
 
 __author__="""Gordon A. MacDonald"""
 __email__='gordonm@nmsu.edu'
-__version__='0.2.0'
+__version__='1.0.0'
 
 idlPath="idl"
 instrList=["IBIS", "FIRS", "SPINOR",

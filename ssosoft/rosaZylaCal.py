@@ -225,6 +225,10 @@ class rosaZylaCal:
 			self.logger.critical("Could not read from FITS header: "
 					"{0}".format(err)
 					)
+		self.logger.info("Auto-detected data dimensions "
+				"(rows, cols): {0}".format(self.dataShape))
+		self.logger.info("Auto-detected image dimensions "
+				"(rows, cols): {0}".format(self.imageShape))
 
 	def rosa_zyla_detect_zyla_dims(self, imageData):
 		## Detects data then usable image dimensions.
@@ -472,8 +476,8 @@ class rosaZylaCal:
 			raise
 
 	def rosa_zyla_save_bursts(self):
-		def rosa_zyla_flatfield_correction():
-			data=self.rosa_zyla_read_binary_image(file)
+		def rosa_zyla_flatfield_correction(data):
+			#data=self.rosa_zyla_read_binary_image(file)
 			corrected=self.gain*(data-self.avgDark)
 			return corrected
 
@@ -485,12 +489,11 @@ class rosaZylaCal:
 						)
 					)
 
-		lastBurst=len(self.dataList)//self.burstNumber
 		burstShape=(self.burstNumber,)+self.imageShape
 		self.logger.info("Preparing burst files, saving in directory: "
 				"{0}".format(self.preSpeckleBase)
 				)
-		self.logger.info("Number of files to be saved: "
+		self.logger.info("Number of files to be read: "
 				"{0}".format(len(self.dataList))
 				)
 		self.logger.info("Flat-fielding and saving data to burst files "
@@ -501,32 +504,73 @@ class rosaZylaCal:
 		burstCube=np.zeros(burstShape, dtype=np.float32)
 		burst=0
 		batch=-1
-		while burst < lastBurst:
-			burstList=self.dataList[burst*self.burstNumber:(burst+1)*self.burstNumber]
+		if 'ZYLA' in self.instrument:
+			lastBurst=len(self.dataList)//self.burstNumber
+			lastFile=lastBurst*self.burstNumber
 			i=0
-			for file in burstList:
-				burstCube[i, :, :]=rosa_zyla_flatfield_correction()
+			for file in self.dataList[:lastFile]:
+				data=self.rosa_zyla_read_binary_image(file)
+				burstCube[i, :, :]=rosa_zyla_flatfield_correction(data)
 				i+=1
-			## Construct filename, KISIP takes batches of 1000 or less.
-			burstThsnds=burst//1000
-			burstHndrds=burst%1000
-			burstFile=os.path.join(
-					self.preSpeckleBase,
-					(self.burstFileForm).format(
-						self.obsDate, self.obsTime, burstThsnds, burstHndrds
+				if i==self.burstNumber:
+					burstThsnds=burst//1000
+					burstHndrds=burst%1000
+					burstFile=os.path.join(
+						self.preSpeckleBase,
+						(self.burstFileForm).format(
+								self.obsDate,
+								self.obsTime,
+								burstThsnds,
+								burstHndrds
+							)
 						)
-					)
-			self.rosa_zyla_save_binary_image_cube(
-					burstCube, 
-					burstFile
-					)
-			rosa_zyla_print_progress_save_bursts()
-			## Add burstThsnds to batchList if needed.
-			if burstThsnds != batch:
-				batch=burstThsnds
-				(self.batchList).append(batch)
-			burst+=1
-
+					self.rosa_zyla_save_binary_image_cube(
+							burstCube,
+							burstFile
+						)
+					rosa_zyla_print_progress_save_bursts()
+					if burstThsnds != batch:
+						batch=burstThsnds
+						(self.batchList).append(batch)
+					burstCube=np.zeros(burstShape,
+							dtype=np.float32
+							)
+					i=0
+					burst+=1
+		if 'ROSA' in self.instrument:
+			i=0
+			for file in self.dataList:
+				with fits.open(file) as hdu:
+					for hduExt in hdu[1:]:
+						lastBurst=len(self.dataList)*len(hdu[1:])//self.burstNumber
+						burstCube[i, :, :]=rosa_zyla_flatfield_correction(hduExt.data)
+						i+=1
+						if i==self.burstNumber:
+							burstThsnds=burst//1000
+							burstHndrds=burst%1000
+							burstFile=os.path.join(
+								self.preSpeckleBase,
+								(self.burstFileForm).format(
+										self.obsDate,
+										self.obsTime,
+										burstThsnds,
+										burstHndrds
+									)
+								)
+							self.rosa_zyla_save_binary_image_cube(
+									burstCube,
+									burstFile
+								)
+							rosa_zyla_print_progress_save_bursts()
+							if burstThsnds != batch:
+								batch=burstThsnds
+								(self.batchList).append(batch)
+							burstCube=np.zeros(burstShape,
+										dtype=np.float32
+										)
+							i=0
+							burst+=1
+	
 		self.logger.info("Burst files complete: {0}".format(self.preSpeckleBase))
 
 	def rosa_zyla_save_cal_images(self):

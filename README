@@ -46,8 +46,6 @@ To do
 	detection results.
 	* Implement seamless end-to-end calibration by developing
 	a container class for running KISIP.
-	* Generalize tools to allow SSOsoft to be able to reduce
-	ROSA data.
 
 
 Known Bugs
@@ -55,8 +53,6 @@ Known Bugs
 
 	* Noise file always written even if no noise file is
 	computed.
-	* After setting up logging for kisipWrapper, logging
-	for RosaZylaCal is disabled.
 
 
 Future

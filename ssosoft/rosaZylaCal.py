@@ -9,10 +9,86 @@ import re
 import sys
 
 class rosaZylaCal:
+
+	"""
+	The Sunsport Solar Observatory Consortium's software for reducing
+	ROSA and Zyla data from the Dunn Solar Telescope.
+
+	-----------------------------------------------------------------
+
+	Use this software package to process/reduce data from the ROSA
+	or Zyla instruments at the Dunn Solar Telescope. This package
+	is designed to be used with the included wrapper for the
+	Kiepenheuer-Institut Speckle Interferometry Package (KISIP).
+	KISIP is not freely available. For more information, please
+	see Woeger & Luehe, 2008, SPIE, 7019E doi:10.1117/12.788062.
+
+	1) Install the softwate using the included distutils script.
+
+	2) Set the necessary instrument parameters in a configuration
+	file (use the included sampleConfig.ini as a template).
+
+	3) Open a Python terminal and do `import ssosoft`.
+
+	4) Start a new instance of the calibration class by doing
+	`r=ssosoft.rosaZylaCal('<instrument>','<path to config file>')`.
+
+	5) Run the standard calibration method
+	`r.rosa_zyla_run_calibration()`.
+
+	6) Use the kisipWrapper class to despeckle images using KISIP.
+
+	-----------------------------------------------------------------
+
+	Parameters
+	----------
+	instrument : str
+		A string containing the instrument name.
+		Accepted values are ROSA_3500, ROSA_4170,
+		ROSA_CAK, ROSA_GBAND, and ZYLA.
+	configFile : str
+		Path to the configuration file.
+
+	-----------------------------------------------------------------
+
+	See Also
+	--------
+
+	kisipWrapper : a Python wrapper for KISIP.
+
+	-----------------------------------------------------------------
+
+	Example
+	-------
+
+	To process a standard Zyla dataset, with configFile 'config.ini'
+	in the current directory, do
+
+		import ssosoft
+		r=ssosoft.rosaZylaCal('zyla', 'config.ini')
+		r.rosa_zyla_run_calibration()
+
+	The necessary files for speckle analysis with KISIP are now
+	available.
+
+	-----------------------------------------------------------------
+	"""
 	
 	from . import ssosoftConfig
 	
 	def __init__(self, instrument, configFile):
+		"""
+		Parameters
+		----------
+		instrument : str
+			A string containing the instrument name.
+			Accepted values are ROSA_3500, ROSA_4170,
+			ROSA_CAK, ROSA_GBAND, and ZYLA.
+		configFile : str
+			Path to the configuration file.
+			
+		"""
+
 		try:
 			assert(instrument.upper() in ['ZYLA', 'ROSA_3500',
 				'ROSA_4170', 'ROSA_CAK', 'ROSA_GBAND']
@@ -57,6 +133,19 @@ class rosaZylaCal:
 		self.workBase=""
 
 	def rosa_zyla_average_image_from_list(self, fileList):
+		"""
+		Computes an average image from a list of image files.
+
+		Parameters
+		----------
+		fileList : list
+			A list of file paths to the images to be averaged.
+
+		Returns
+		-------
+		numpy.ndarray
+			2-Dimensional with dtype np.float32.
+		"""
 		def rosa_zyla_print_average_image_progress():
 			if not fNum % 100:
 				self.logger.info("Progress: "
@@ -88,9 +177,16 @@ class rosaZylaCal:
 		return avgIm
 
 	def rosa_zyla_check_dark_data_flat_shapes(self):
+		"""
+		Checks dark, data, and flat frame sizes are all the same.
+		NOT YET IMPLEMENTED.
+		"""
 		pass
 
 	def rosa_zyla_compute_gain(self):
+		"""
+		Computes the gain table.
+		"""
 		self.logger.info("Computing gain table.")
 		darkSubtracted=self.avgFlat-self.avgDark
 		try:
@@ -103,6 +199,9 @@ class rosaZylaCal:
 		self.logger.info("Gain table computed.")
 
 	def rosa_zyla_compute_noise_file(self):
+		"""
+		Computes the noise file needed by KISIP. Optional.
+		"""
 		self.logger.info("Computing noise cube: shape: "
 				"{0}".format(self.imageShape+(self.burstNumber,))
 				)
@@ -131,6 +230,10 @@ class rosaZylaCal:
 				)
 	
 	def rosa_zyla_configure_run(self):
+		"""
+		Configures the rosaZylaCal instance according to the contents of
+		configFile.
+		"""
 		def rosa_zyla_assert_base_dirs(baseDir):
 			assert(os.path.isdir(baseDir)), (
 					"Directory does not exist: {0}".format(baseDir)
@@ -218,6 +321,14 @@ class rosaZylaCal:
 			self.logger.info("Using flat directory: {0}".format(self.flatBase))
 
 	def rosa_zyla_detect_rosa_dims(self, header):
+		"""
+		Detects data and image dimensions in ROSA FITS image file headers.
+
+		Parameters
+		----------
+		header : astropy.io.fits.header
+			A FITS header conforming to the FITS specification.
+		"""
 		try:
 			self.dataShape=(header['NAXIS2'], header['NAXIS1'])
 			self.imageShape=(header['NAXIS2'], header['NAXIS1'])
@@ -231,6 +342,15 @@ class rosaZylaCal:
 				"(rows, cols): {0}".format(self.imageShape))
 
 	def rosa_zyla_detect_zyla_dims(self, imageData):
+		"""
+		Detects the data and image dimensions in Zyla unformatted
+		binary image files.
+
+		Parameters
+		----------
+		imageData : numpy.ndarray
+			A one-dimensional Numpy array containing image data.
+		"""
 		## Detects data then usable image dimensions.
 		## Assumes all overscan regions within the raw
 		## image has a zero value. If no overscan,
@@ -293,6 +413,14 @@ class rosaZylaCal:
 				"(rows, cols): {0}".format(self.imageShape))
 
 	def rosa_zyla_display_image(self,im):
+		"""
+		Displays image data.
+
+		Parameters
+		----------
+		im : numpy.ndarray or array-like
+			A 2-dimensional array containing image data.
+		"""
 		plt.imshow(im, origin='upper',
 				interpolation='none',
 				cmap='hot'
@@ -300,6 +428,11 @@ class rosaZylaCal:
 		plt.show()
 
 	def rosa_zyla_get_cal_images(self):
+		"""
+		Reads average dark, average flat, and gain files and store as class
+		attributes if exist. If these files do not exist, compute the average
+		dark, average flat, and gain images and store as class attributes.
+		"""
 		if os.path.exists(self.darkFile):
 			self.logger.info("Average dark file found: {0}".format(self.darkFile))
 			self.logger.info("Reading average dark.")
@@ -328,6 +461,10 @@ class rosaZylaCal:
 
 
 	def rosa_zyla_get_file_lists(self):
+		"""
+		Construct darkList, dataList, and flatList attributes, which
+		are lists of respective file types.
+		"""
 		def rosa_zyla_assert_file_list(fList):
 			assert(len(fList)!=0), "List contains no matches."
 
@@ -369,6 +506,14 @@ class rosaZylaCal:
 			self.logger.info("Files in flatList: {0}".format(len(self.flatList)))
 
 	def rosa_zyla_get_data_image_shapes(self, file):
+		"""
+		The main data and image shape detection method.
+
+		Parameters
+		----------
+		file : str
+			Path to image file.
+		"""
 		self.logger.info("Detecting image and data dimensions in "
 				"file: {0}".format(file)
 				)
@@ -397,6 +542,11 @@ class rosaZylaCal:
 
 
 	def rosa_zyla_order_files(self):
+		"""
+		Orders sequentially numbered file names in numerical order.
+		Contains a special provision for ordering Zyla files, which 
+		begin with the least-significant digit.
+		"""
 		def rosa_zyla_order_file_list(fList):
 			if 'ZYLA' in self.instrument:
 				orderList=['']*len(fList) ## List length same as fList
@@ -432,6 +582,23 @@ class rosaZylaCal:
 		self.dataList=rosa_zyla_order_file_list(self.dataList)
 
 	def rosa_zyla_read_binary_image(self, file, dataShape=None, imageShape=None):
+		"""
+		Reads an unformatted binary file of type uint16.
+		Slices the image as s[i] ~ 0:imageShape[i].
+
+		Parameters
+		----------
+		file : str
+			Path to binary image file.
+		dataShape : tuple
+			Shape of the image or cube.
+		imageShape : tuple
+			Shape of sub-image or region of interest.
+
+		Returns
+		-------
+		numpy.ndarray : np.float32, shape imageShape.
+		"""
 		if dataShape is None:
 			dataShape=self.dataShape
 		if imageShape is None:
@@ -456,7 +623,10 @@ class rosaZylaCal:
 		im=im[s]
 		return np.float32(im)
 
-	def rosa_zyla_run_zyla_calibration(self):
+	def rosa_zyla_run_calibration(self):
+		"""
+		The main calibration method for standard ROSA or Zyla data.
+		"""
 		self.rosa_zyla_configure_run()
 		self.logger.info("Starting standard ZYLA calibration.")
 		self.rosa_zyla_get_file_lists()
@@ -468,6 +638,16 @@ class rosaZylaCal:
 		self.logger.info("Finished standard ZYLA calibration.")
 
 	def rosa_zyla_save_binary_image_cube(self, data, file):
+		"""
+		Saves binary images cubes formatted for KISIP.
+
+		Parameters
+		----------
+		data : numpy.ndarray dtype np.float32
+			Image data to be saved.
+		file : str
+			Named path to save the image cube.
+		"""
 		try:
 			with open(file, mode='wb') as f:
 				data.tofile(f)
@@ -476,6 +656,9 @@ class rosaZylaCal:
 			raise
 
 	def rosa_zyla_save_bursts(self):
+		"""
+		Main method to save burst cubes formatted for KISIP.
+		"""
 		def rosa_zyla_flatfield_correction(data):
 			#data=self.rosa_zyla_read_binary_image(file)
 			corrected=self.gain*(data-self.avgDark)
@@ -574,6 +757,10 @@ class rosaZylaCal:
 		self.logger.info("Burst files complete: {0}".format(self.preSpeckleBase))
 
 	def rosa_zyla_save_cal_images(self):
+		"""
+		Saves average dark, average flat, gain, and noise images
+		in FITS format.
+		"""
 		if os.path.exists(self.darkFile):
 			self.logger.info("Dark file already exists: {}".format(self.darkFile))
 		else:
@@ -644,6 +831,10 @@ class rosaZylaCal:
 					)
 
 	def rosa_zyla_save_despeckled_as_fits(self):
+		"""
+		Saves despeckled (processed unformatted binary) KISIP images as
+		FITS images.
+		"""
 		self.logger.info("Saving despeckled binary image files to FITS.")
 		self.logger.info("Searching for files: "
 				"{0}".format(
@@ -683,6 +874,18 @@ class rosaZylaCal:
 				"in directory: {0}".format(self.postSpeckleBase))
 
 	def rosa_zyla_save_fits_image(self, image, file, clobber=True):
+		"""
+		Saves 2-dimensional image data to a FITS file.
+
+		Parameters
+		----------
+		image : numpy.ndarray
+			Two-dimensional image data to save.
+		file : str
+			Path to file to save to.
+		clobber : bool
+			Overwrite existing file if True, otherwise do not overwrite. 
+		"""
 		hdu=fits.PrimaryHDU(image)
 		hdul=fits.HDUList([hdu])
 		try:

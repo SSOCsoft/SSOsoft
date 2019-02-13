@@ -1,9 +1,3 @@
-"""
-This is a wrapper library for running KISIP with
-regular Rosa/Zyla data reduction runs.
-
-Initialize with an instance of RosaZylaCal class.
-"""
 import configparser
 import glob
 import logging, logging.config
@@ -11,37 +5,106 @@ import os
 import subprocess
 
 class kisipWrapper:
+	"""
+	A wrapper class for the Kiepenheuer-Institut Speckle
+	Interferometry Package (KISIP) to be used with the SSOsoft
+	rosaZylaCal calibration class for ROSA and Zyla datasets.
+
+	-----------------------------------------------------------------
+
+	Use this wrapper class to despeckle prepared ROSA or Zyla
+	datasets using KISIP. The kisipWrapper class is initialized with
+	an instance of the rosaZylaCal class. KISIP is not freely
+	available. For more information about KISIP, please consult
+	Woeger & Luehe, 2008, SPIE, 7019E doi:10.1117/12.788062.
+
+	1) Set the necessary KISIP parameters in a configuration file
+	(use the included sampleConfig.ini as a template).
+
+	2) Prepare a dataset using the rosaZylaCal class.
+
+	3) Initialize an instance of the kisipWrapper class by passing
+	an instance of the rosaZylaCal class. For example,
+	k=ssosoft.kisipWrapper(r), where r is an instance of the
+	rosaZylaCal class.
+
+	4) Configure and run KISIP by doing
+	k.kisip_despeckle_all_batches().
+
+	-----------------------------------------------------------------
+
+	Parameters
+	----------
+
+	rosaZylaCal : rosaZylaCal class instance
+		An instance of the rosaZylaClass.
+
+	-----------------------------------------------------------------
+
+	See Also
+	--------
+
+	rosaZylaCal : a ROSA/Zyla dataset configuration class.
+
+	-----------------------------------------------------------------
+
+	Example
+	-------
+
+	To despeckle a standard Zyla dataset with configuration
+	parameters stored in config.ini in the current directory
+
+		import ssosoft
+		r=ssosoft.rosaZylaCamCal('zyla','config.ini')
+		r.rosa_zyla_run_calibration()
+		k=ssosoft.kisipWrapper(r)
+		k.kisip_despeckle_all_batches()
+
+	The kisipWrapper class will configure and run KISIP. The results
+	are retreived by using the methods in the rosaZylaCal class.
+	"""
 
 	from . import ssosoftConfig
 
-	def __init__(self, RHCC):
-		self.batchList=RHCC.batchList
-		self.burstFileForm=RHCC.burstFileForm
-		self.burstNumber=RHCC.burstNumber
-		self.configFile=RHCC.configFile
-		self.imageShape=RHCC.imageShape
-		self.instrument=RHCC.instrument.upper()
+	def __init__(self, rosaZylaCal):
+		"""
+		Parameters
+		----------
+		rosaZylaCal : rosaZylaCal class instance
+			An instance of the rosaZylaCal class.
+		"""
+		self.batchList=rosaZylaCal.batchList
+		self.burstFileForm=rosaZylaCal.burstFileForm
+		self.burstNumber=rosaZylaCal.burstNumber
+		self.configFile=rosaZylaCal.configFile
+		self.imageShape=rosaZylaCal.imageShape
+		self.instrument=rosaZylaCal.instrument.upper()
 		self.kisipPreSpeckleBatch=0
 		self.kisipPreSpeckleStartInd=0
 		self.kisipPreSpeckleEndInd=0
-		#self.logFile=RHCC.logFile
-		self.noiseFile=RHCC.noiseFile
-		self.obsDate=RHCC.obsDate
-		self.obsTime=RHCC.obsTime
-		self.postSpeckleBase=RHCC.postSpeckleBase
-		self.preSpeckleBase=RHCC.preSpeckleBase
-		self.speckleBase=RHCC.speckleBase
-		self.workBase=RHCC.workBase
+		self.noiseFile=rosaZylaCal.noiseFile
+		self.obsDate=rosaZylaCal.obsDate
+		self.obsTime=rosaZylaCal.obsTime
+		self.postSpeckleBase=rosaZylaCal.postSpeckleBase
+		self.preSpeckleBase=rosaZylaCal.preSpeckleBase
+		self.speckleBase=rosaZylaCal.speckleBase
+		self.workBase=rosaZylaCal.workBase
 
 		self.logFile=os.path.join(
 				self.workBase,
 				'{0}_{1}_kisip.log'.format(
-					RHCC.obsTime,
-					RHCC.instrument.lower()
+					rosaZylaCal.obsTime,
+					rosaZylaCal.instrument.lower()
 					)
 				)
 	
 	def kisip_configure_run(self):
+		"""
+		Configures the instance of kisipWrapper using the
+		attributes inherited from the rosaZylaCal class instance,
+		which in turn uses the contents of the configuration
+		file.
+		"""
 		config=configparser.ConfigParser()
 		config.read(self.configFile)
 	
@@ -112,6 +175,10 @@ class kisipWrapper:
 				raise
 
 	def kisip_despeckle_all_batches(self):
+		"""
+		The main method used for despeckling image data with
+		KISIP.
+		"""
 		self.kisip_configure_run()
 		self.logger.info("Preparing to run KISIP on batches: "
 				"{0}".format(self.batchList)
@@ -123,6 +190,10 @@ class kisipWrapper:
 			self.kisip_spawn_kisip()
 	
 	def kisip_set_environment(self):
+		"""
+		Sets the necessary operating sytstem environment
+		variables needed to run KISIP.
+		"""
 		self.logger.info("Setting system environment variables for KISIP.")
 		self.logger.info("Pre-appending to PATH: {0}".format(self.kisipEnvBin))
 		os.environ['PATH']="{0}{1}{2}".format(
@@ -133,6 +204,17 @@ class kisipWrapper:
 				)
 
 	def kisip_set_batch_start_end_inds(self, batch):
+		"""
+		Sets the starting and ending file indices in the KISIP
+		configuration files. Always assumes the starting index
+		is 0, which is a risky assumption.
+
+		Parameters
+		----------
+		batch : int
+			The KISIP pre-speckled image batch number to be
+			processed.
+		"""
 		self.logger.info("Setting batch number: {0}".format(batch))
 		self.kisipPreSpeckleBatch=batch
 		self.logger.info("Searching for files: {0}".format(
@@ -188,6 +270,10 @@ class kisipWrapper:
 		self.kisipPreSpeckleEndInd=nFile-1	## Following assumption.
 
 	def kisip_spawn_kisip(self):
+		"""
+		Spawns KISIP using an MPI runner and parameters specified
+		in the configuration file.
+		"""
 		kisipCommand="{0} {1} {2} {3}".format(
 				os.path.join(self.kisipEnvBin, self.kisipEnvMpirun),
 				'-np',
@@ -228,6 +314,9 @@ class kisipWrapper:
 					)
 
 	def kisip_write_init_files(self):
+		"""
+		Writes the KISIP configuration files.
+		"""
 		self.logger.info("Preparing to write KISIP init files.")
 		self.logger.info("Writing KISIP config file: "
 				"{0}".format(os.path.join(self.workBase, 'init_file.dat'))

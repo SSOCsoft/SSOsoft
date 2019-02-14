@@ -581,10 +581,10 @@ class rosaZylaCal:
 		self.logger.info("Sorting dataList.")
 		self.dataList=rosa_zyla_order_file_list(self.dataList)
 
-	def rosa_zyla_read_binary_image(self, file, dataShape=None, imageShape=None):
+	def rosa_zyla_read_binary_image(self, file, dataShape=None, imageShape=None, dtype=np.uint16):
 		"""
-		Reads an unformatted binary file of type uint16.
-		Slices the image as s[i] ~ 0:imageShape[i].
+		Reads an unformatted binary file. Slices the image as
+		s[i] ~ 0:imageShape[i].
 
 		Parameters
 		----------
@@ -594,6 +594,8 @@ class rosaZylaCal:
 			Shape of the image or cube.
 		imageShape : tuple
 			Shape of sub-image or region of interest.
+		dtype : Numpy numerical data type.
+			Default is numpy.uint16.
 
 		Returns
 		-------
@@ -607,7 +609,7 @@ class rosaZylaCal:
 		try:
 			with open(file, mode='rb') as imageFile:
 				imageData=np.fromfile(imageFile,
-						dtype=np.uint16
+						dtype=dtype
 						)
 		except Exception as err:
 			self.logger.critical("Could not open/read binary image file: "
@@ -660,7 +662,6 @@ class rosaZylaCal:
 		Main method to save burst cubes formatted for KISIP.
 		"""
 		def rosa_zyla_flatfield_correction(data):
-			#data=self.rosa_zyla_read_binary_image(file)
 			corrected=self.gain*(data-self.avgDark)
 			return corrected
 
@@ -860,16 +861,18 @@ class rosaZylaCal:
 			self.logger.info("Found {0} files.".format(len(fList)))
 		for file in fList:
 			im=self.rosa_zyla_read_binary_image(file,
-					imageShape=self.imageShape[::-1]+(2,),
-					dataShape=self.imageShape[::-1]+(2,)
-					) ## KISIP saves with Fortran ordering.
-			fName=os.path.basename(file)
-			self.rosa_zyla_save_fits_image(im[:, :, 1],
-					os.path.join(
-						self.postSpeckleBase,
-						fName+'.fits'
-						)
+					#imageShape=self.imageShape[::-1]+(2,),
+					#dataShape=self.imageShape[::-1]+(2,)
+					imageShape=self.imageShape,
+					dataShape=self.imageShape,
+					dtype=np.float32
 					)
+			fName=os.path.basename(file)
+			self.rosa_zyla_save_fits_image(im, os.path.join( 
+				self.postSpeckleBase,
+				fName+'.fits'
+				)
+				)
 		self.logger.info("Finished saving despeckled images as FITS"
 				"in directory: {0}".format(self.postSpeckleBase))
 

@@ -861,8 +861,6 @@ class rosaZylaCal:
 			self.logger.info("Found {0} files.".format(len(fList)))
 		for file in fList:
 			im=self.rosa_zyla_read_binary_image(file,
-					#imageShape=self.imageShape[::-1]+(2,),
-					#dataShape=self.imageShape[::-1]+(2,)
 					imageShape=self.imageShape,
 					dataShape=self.imageShape,
 					dtype=np.float32
@@ -873,7 +871,7 @@ class rosaZylaCal:
 				fName+'.fits'
 				)
 				)
-		self.logger.info("Finished saving despeckled images as FITS"
+		self.logger.info("Finished saving despeckled images as FITS "
 				"in directory: {0}".format(self.postSpeckleBase))
 
 	def rosa_zyla_save_fits_image(self, image, file, clobber=True):

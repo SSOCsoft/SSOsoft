@@ -90,13 +90,8 @@ class kisipWrapper:
 		self.speckleBase=rosaZylaCal.speckleBase
 		self.workBase=rosaZylaCal.workBase
 
-		self.logFile=os.path.join(
-				self.workBase,
-				'{0}_{1}_kisip.log'.format(
-					rosaZylaCal.obsTime,
-					rosaZylaCal.instrument.lower()
-					)
-				)
+		self.logFile=rosaZylaCal.logFile
+		self.logger=rosaZylaCal.logger
 	
 	def kisip_configure_run(self):
 		"""
@@ -133,12 +128,6 @@ class kisipWrapper:
 		self.kisipEnvMpiNproc=config['KISIP_ENV']['kisipEnvMpiNproc']
 		self.kisipEnvMpirun=config['KISIP_ENV']['kisipEnvMpirun']
 		self.kisipEnvKisipExe=config['KISIP_ENV']['kisipEnvKisipExe']
-	
-		## Set-up logging.
-		logging.config.fileConfig(self.configFile,
-				defaults={'logfilename': self.logFile}
-				)
-		self.logger=logging.getLogger('kisipLog')
 	
 		self.logger.info("This is kisipWrapper, part of SSOsoft "
 				"version {0}".format(self.ssosoftConfig.__version__)
@@ -290,20 +279,26 @@ class kisipWrapper:
 				)
 		try:
 			os.chdir(self.workBase)
-			returnCode=subprocess.call([
-						os.path.join(self.kisipEnvBin, self.kisipEnvMpirun),
-						'-np',
-						self.kisipEnvMpiNproc,
-						os.path.join(self.kisipEnvBin, self.kisipEnvKisipExe)
-						]
-						)
+			process=subprocess.Popen([
+				os.path.join(self.kisipEnvBin, self.kisipEnvMpirun),
+					'-np',
+					self.kisipEnvMpiNproc,
+					os.path.join(self.kisipEnvBin, self.kisipEnvKisipExe)
+					],
+					stdout=subprocess.PIPE,
+					stderr=subprocess.STDOUT
+					)
+			with process.stdout as pipe:
+				for line in iter(pipe.readline, b''):
+					self.logger.info((line.strip()).decode('utf-8'))
+			returnCode=process.wait()
+
 		except Exception as err:
 			self.logger.critical("CRITICAL: KISIP run failed: {0}".format(err))
-			raise
-		if returnCode:
 			self.logger.error("Something went wrong with KISIP run. "
 					"Check logfile. Code: {0}".format(returnCode)
 					)
+			raise
 		else:
 			self.logger.info(
 					"KISIP batch: {0} exited with code: "

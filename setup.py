@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='SSOsoft',
-		version='1.1.0',
+		version='1.1.1',
 		description='Sunspot Solar Observatory Python Utilities',
 		author='Gordon A. MacDonald',
 		author_email='gordonm@nmsu.edu',

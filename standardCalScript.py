@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
 """
-The standard run script for ROSA and Zyla dataset calibration.
+The standard run script for the calibration of SSOC ROSA and Zyla
+datasets.
 
-USAGE:
+-------------------------------------------------------------------------
+
+Usage
+-----
+
 	standardCalScript.py <instrument name> <configuration file>
 
 	instrument name : any of the following: ROSA_3500, ROSA_4170,
@@ -13,6 +18,8 @@ USAGE:
 		Consult the ssosoft documents for more information about
 		this file.
 
+-------------------------------------------------------------------------
+
 This script completes all the steps necessary for an end-to-end
 calibration for ROSA and Zyla datasets including speckle reconstruction
 with the Kiepenheuer-Institut Speckle Interferometry Package (KISIP).
@@ -21,13 +28,21 @@ class to write to a log file named '<obsTime>_<instrument name>.log'.
 In that log, the user will find informative messages regarding the
 progress of the calibration.
 
-AUTHOR:
+-------------------------------------------------------------------------
+
+Author
+------
 
 	G.A. MacDonald, NMSU, gordonm@nmsu.edu
 
-WEBSITE:
+-------------------------------------------------------------------------
+
+Website
+-------
 
 	https://github.com/SSOCsoft/SSOsoft
+
+-------------------------------------------------------------------------
 """
 
 import ssosoft

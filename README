@@ -44,8 +44,7 @@ To do
 	
 	* Develop a test for the integrity of automatic image shape
 	detection results.
-	* Implement seamless end-to-end calibration by developing
-	a container class for running KISIP.
+	* Integrate header info for ROSA and Zyla datasets.
 
 
 Known Bugs
@@ -71,7 +70,7 @@ harder.
 
 	* Christian Beck, National Solar Observatory.
 	* David Jess, Queens University, Belfast.
-	* Friedrich Weoger, National Solar Observatory.
+	* Friedrich Woeger, National Solar Observatory.
 
 
 Software and Hardware Requirements

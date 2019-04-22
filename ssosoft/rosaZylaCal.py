@@ -149,7 +149,7 @@ class rosaZylaCal:
 		def rosa_zyla_print_average_image_progress():
 			if not fNum % 100:
 				self.logger.info("Progress: "
-						"{:0.1%}.".format(fNum/len(fileList))
+						"{:0.1%}.".format(fNum/numImg)
 						)
 
 		self.logger.info("Computing average image from {0} files "
@@ -161,15 +161,32 @@ class rosaZylaCal:
 		fNum=0
 		for file in fileList:
 			if 'ZYLA' in self.instrument:
+				if fNum == 0:
+					numImg=len(fileList)
 				avgIm=avgIm+self.rosa_zyla_read_binary_image(file)
 				fNum+=1
+				rosa_zyla_print_average_image_progress()
 			if 'ROSA' in self.instrument:
 				with fits.open(file) as hdu:
+					if fNum == 0:
+						numImg=len(fileList)*len(hdu[1:])
 					for ext in hdu[1:]:
 						avgIm=avgIm+ext.data
 						fNum+=1
-			rosa_zyla_print_average_image_progress()
+						rosa_zyla_print_average_image_progress()
 		avgIm=avgIm/fNum
+
+		self.logger.info("Images averaged/images predicted: "
+				"{0}/{1}".format(fNum,numImg)
+				)
+		try:
+			assert fNum == numImg
+		except AssertionError as err:
+			self.logger.warning("Number of images averaged does not match the "
+					"number predicted. If instrument is ROSA, then "
+					"this might be OK. Otherwise, something went wrong."
+					)
+			self.logger.warning("This calibration will continue to run.")
 
 		self.logger.info("Average complete, directory: "
 				"{0}".format(os.path.dirname(fileList[0]))
@@ -625,19 +642,33 @@ class rosaZylaCal:
 		im=im[s]
 		return np.float32(im)
 
-	def rosa_zyla_run_calibration(self):
+	def rosa_zyla_run_calibration(self, saveBursts=True):
 		"""
 		The main calibration method for standard ROSA or Zyla data.
+
+		Parameters
+		----------
+
+		saveBursts : bool
+			Default True. Set to True to save burst cubes.
+			Set to False to skip saving burst cubes.
 		"""
 		self.rosa_zyla_configure_run()
-		self.logger.info("Starting standard ZYLA calibration.")
+		self.logger.info("Starting standard {0} calibration.".format(self.instrument)
+				)
 		self.rosa_zyla_get_file_lists()
 		self.rosa_zyla_order_files()
 		self.rosa_zyla_get_data_image_shapes(self.flatList[0])
 		self.rosa_zyla_get_cal_images()
 		self.rosa_zyla_save_cal_images()
-		self.rosa_zyla_save_bursts()
-		self.logger.info("Finished standard ZYLA calibration.")
+		if saveBursts:
+			self.rosa_zyla_save_bursts()
+		else:
+			self.logger.info("SaveBursts set to {0}. "
+					"Skipping the save bursts step.".format(saveBursts)
+					)
+		self.logger.info("Finished standard {0} calibration.".format(self.instrument)
+				)
 
 	def rosa_zyla_save_binary_image_cube(self, data, file):
 		"""
@@ -712,6 +743,8 @@ class rosaZylaCal:
 							burstCube,
 							burstFile
 						)
+					i=0
+					burst+=1
 					rosa_zyla_print_progress_save_bursts()
 					if burstThsnds != batch:
 						batch=burstThsnds
@@ -719,14 +752,13 @@ class rosaZylaCal:
 					burstCube=np.zeros(burstShape,
 							dtype=np.float32
 							)
-					i=0
-					burst+=1
 		if 'ROSA' in self.instrument:
 			i=0
 			for file in self.dataList:
 				with fits.open(file) as hdu:
 					for hduExt in hdu[1:]:
-						lastBurst=len(self.dataList)*len(hdu[1:])//self.burstNumber
+						if (burst == 0) and (i == 0):
+							lastBurst=len(self.dataList)*len(hdu[1:])//self.burstNumber
 						burstCube[i, :, :]=rosa_zyla_flatfield_correction(hduExt.data)
 						i+=1
 						if i==self.burstNumber:
@@ -745,6 +777,8 @@ class rosaZylaCal:
 									burstCube,
 									burstFile
 								)
+							i=0
+							burst+=1
 							rosa_zyla_print_progress_save_bursts()
 							if burstThsnds != batch:
 								batch=burstThsnds
@@ -752,8 +786,6 @@ class rosaZylaCal:
 							burstCube=np.zeros(burstShape,
 										dtype=np.float32
 										)
-							i=0
-							burst+=1
 	
 		self.logger.info("Burst files complete: {0}".format(self.preSpeckleBase))
 

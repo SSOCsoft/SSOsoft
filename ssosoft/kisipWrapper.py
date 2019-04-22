@@ -105,11 +105,11 @@ class kisipWrapper:
 	
 		self.kisipArcsecPerPixX=config[self.instrument]['kisipArcsecPerPixX']
 		self.kisipArcsecPerPixY=config[self.instrument]['kisipArcsecPerPixY']
+		self.kisipMethodSubfieldArcsec=config[self.instrument]['kisipMethodSubfieldArcsec']
 		self.speckledFileForm=config[self.instrument]['speckledFileForm']
 		self.wavelengthnm=config[self.instrument]['wavelengthnm']
 	
 		self.kisipMethodMethod=config['KISIP_METHOD']['kisipMethodMethod']
-		self.kisipMethodSubfieldArcsec=config['KISIP_METHOD']['kisipMethodSubfieldArcsec']
 		self.kisipMethodPhaseRecLimit=config['KISIP_METHOD']['kisipMethodPhaseRecLimit']
 		self.kisipMethodUX=config['KISIP_METHOD']['kisipMethodUX']
 		self.kisipMethodUV=config['KISIP_METHOD']['kisipMethodUV']

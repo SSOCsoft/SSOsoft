@@ -44,7 +44,7 @@ To do
 	
 	* Develop a test for the integrity of automatic image shape
 	detection results.
-	* Integrate header info for ROSA and Zyla datasets.
+	* Integrate header info for Zyla datasets.
 
 
 Known Bugs

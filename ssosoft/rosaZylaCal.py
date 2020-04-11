@@ -38,6 +38,9 @@ class rosaZylaCal:
 
 	6) Use the kisipWrapper class to despeckle images using KISIP.
 
+	7) Save final FITS files
+	`r.rosa_zyla_save_despeckled_as_fits()`
+
 	-----------------------------------------------------------------
 
 	Parameters
@@ -70,6 +73,14 @@ class rosaZylaCal:
 
 	The necessary files for speckle analysis with KISIP are now
 	available.
+
+	-----------------------------------------------------------------
+
+	Modifications
+	-------------
+
+	04/10/2020 Headers included in the final FITS files (ROSA only)
+	by Ondrej Prochazka (ondrejp@nmsu.edu)
 
 	-----------------------------------------------------------------
 	"""
@@ -767,12 +778,25 @@ class rosaZylaCal:
 							burstFile=os.path.join(
 								self.preSpeckleBase,
 								(self.burstFileForm).format(
-										self.obsDate,
-										self.obsTime,
-										burstThsnds,
-										burstHndrds
+									self.obsDate,
+									self.obsTime,
+									burstThsnds,
+									burstHndrds
 									)
 								)
+                            #here I should embed a line writting txt file with header
+                            #this could probably make another module
+							text_file = open(burstFile+'.txt', "w")
+							text_file.write(repr(hdu[burstHndrds+1].header)+"\n")
+							text_file.write("\n")
+							text_file.write(repr(hdu[0].header))
+							#print(burstFile)
+							#keywords = list(hdu[burstThsnds].header.keys())
+							#for L in range (len(keywords)):
+								#text_file.writelines(keywords[L])
+#								text_file.writelines(hdu[burstThsnds].header[L])
+							text_file.close()
+                            #the end of my alternations related to a header export
 							self.rosa_zyla_save_binary_image_cube(
 									burstCube,
 									burstFile
@@ -884,6 +908,31 @@ class rosaZylaCal:
 				)[:-7]+'*.final'
 			)
 			)
+		fListOrder = []
+		for b in range (len(fList)):
+			proxy1 = fList[b].split('speckle.batch.')
+			proxy2 = proxy1[1].split('.')
+			fListOrder.append(proxy2[1])
+		fListOrder = [int(s) for s in fListOrder]
+		fListCorrect = list(fList)
+		for i in range(len(fList)): fListCorrect[fListOrder[i]] = fList[i]
+		#print(fList, fListOrder, fListCorrect)
+
+		#print(glob.glob(self.preSpeckleBase+'/*.txt'))
+		headerList = glob.glob(os.path.join(self.preSpeckleBase+'/*.txt'))
+		#print(headerList)
+		headerListOrder = []
+		for b in range (len(headerList)):
+			proxy1 = headerList[b].split('raw.batch.')
+			proxy2 = proxy1[1].split('.')
+			headerListOrder.append(proxy2[1])
+			#print(proxy1)
+		headerListOrder = [int(s) for s in headerListOrder]
+		#print(headerListOrder)
+		#headerList = headerList[headerListOrder]
+		headerListCorrect = list(headerList)
+		for i in range(len(headerList)): headerListCorrect[headerListOrder[i]] = headerList[i]
+		#print(fListCorrect,headerListCorrect)
 		try:
 			assert(len(fList) != 0)
 		except Exception as err:
@@ -891,22 +940,27 @@ class rosaZylaCal:
 			raise
 		else:
 			self.logger.info("Found {0} files.".format(len(fList)))
-		for file in fList:
-			im=self.rosa_zyla_read_binary_image(file,
+		#for file in fList:
+		#print(fListCorrect)
+		for i in range(len(fList)):
+			im=self.rosa_zyla_read_binary_image(fList[i],
 					imageShape=self.imageShape,
 					dataShape=self.imageShape,
 					dtype=np.float32
 					)
-			fName=os.path.basename(file)
+			fName=os.path.basename(fList[i])
+			#print(i)
+			headerFile = open(headerListCorrect[i], "r")
 			self.rosa_zyla_save_fits_image(im, os.path.join( 
 				self.postSpeckleBase,
 				fName+'.fits'
+				), headerFile.readlines()
 				)
-				)
+			headerFile.close()
 		self.logger.info("Finished saving despeckled images as FITS "
 				"in directory: {0}".format(self.postSpeckleBase))
 
-	def rosa_zyla_save_fits_image(self, image, file, clobber=True):
+	def rosa_zyla_save_fits_image(self, image, file, header='', clobber=True):
 		"""
 		Saves 2-dimensional image data to a FITS file.
 
@@ -919,8 +973,31 @@ class rosaZylaCal:
 		clobber : bool
 			Overwrite existing file if True, otherwise do not overwrite. 
 		"""
+		#for i in range(len(header)): header[i].translate({ord("'"): None})
+		#print(header)
 		hdu=fits.PrimaryHDU(image)
+		if len(header) == 35:
+			hdr = hdu.header
+			indexHeader = [5,6,7,8]
+			for i in indexHeader:
+				lineBreak = header[i].split('=')
+				lineBreak2 = lineBreak[1].split('/')
+		#		print(i)
+		#		print(type(str(lineBreak2[0])))
+				hdr[lineBreak[0]] = int(lineBreak2[0])
+			indexHeaderString = [9, 10, 11, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+			for i in indexHeaderString:
+				lineBreak = header[i].split('=')
+				lineBreak2 = lineBreak[1].split('/')
+				#print('s')
+				hdr[lineBreak[0]] = lineBreak2[0].replace('\n',' ').replace("'",'').strip()
+		#	print(hdr)
+			#empty_primary = fits.PrimaryHDU(header = hdr)
+                #try:
+				#	hdr[lineBreak[0]]=lineBreak2[0]#.translate({ord("'"): None})
+		#hdr = hdu.header
 		hdul=fits.HDUList([hdu])
+		
 		try:
 			hdul.writeto(file, clobber=clobber)
 		except Exception as err:

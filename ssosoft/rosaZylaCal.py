@@ -38,9 +38,6 @@ class rosaZylaCal:
 
 	6) Use the kisipWrapper class to despeckle images using KISIP.
 
-	7) Save final FITS files
-	`r.rosa_zyla_save_despeckled_as_fits()`
-
 	-----------------------------------------------------------------
 
 	Parameters
@@ -73,14 +70,6 @@ class rosaZylaCal:
 
 	The necessary files for speckle analysis with KISIP are now
 	available.
-
-	-----------------------------------------------------------------
-
-	Modifications
-	-------------
-
-	04/10/2020 Headers included in the final FITS files (ROSA only)
-	by Ondrej Prochazka (ondrejp@nmsu.edu)
 
 	-----------------------------------------------------------------
 	"""
@@ -765,6 +754,7 @@ class rosaZylaCal:
 							)
 		if 'ROSA' in self.instrument:
 			i=0
+			header_index = 0
 			for file in self.dataList:
 				with fits.open(file) as hdu:
 					for hduExt in hdu[1:]:
@@ -772,6 +762,7 @@ class rosaZylaCal:
 							lastBurst=len(self.dataList)*len(hdu[1:])//self.burstNumber
 						burstCube[i, :, :]=rosa_zyla_flatfield_correction(hduExt.data)
 						i+=1
+						header_index+=1
 						if i==self.burstNumber:
 							burstThsnds=burst//1000
 							burstHndrds=burst%1000
@@ -787,7 +778,8 @@ class rosaZylaCal:
                             #here I should embed a line writting txt file with header
                             #this could probably make another module
 							text_file = open(burstFile+'.txt', "w")
-							text_file.write(repr(hdu[burstHndrds+1].header)+"\n")
+							if header_index >= 257:	header_index = header_index - 256 
+							text_file.write(repr(hdu[header_index].header)+"\n")
 							text_file.write("\n")
 							text_file.write(repr(hdu[0].header))
 							#print(burstFile)

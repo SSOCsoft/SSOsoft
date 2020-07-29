@@ -1,4 +1,7 @@
 import astropy.io.fits as fits
+from astropy.time import Time
+from astropy.time import TimeDelta
+from datetime import datetime
 import configparser
 import glob
 import logging, logging.config
@@ -11,7 +14,7 @@ import sys
 class rosaZylaCal:
 
 	"""
-	The Sunsport Solar Observatory Consortium's software for reducing
+	The Sunspot Solar Observatory Consortium's software for reducing
 	ROSA and Zyla data from the Dunn Solar Telescope.
 
 	-----------------------------------------------------------------
@@ -129,6 +132,8 @@ class rosaZylaCal:
 		self.noiseFile=""
 		self.obsDate=""
 		self.obsTime=""
+		self.expTimems=""
+        
 		self.preSpeckleBase=""
 		self.workBase=""
 
@@ -270,6 +275,7 @@ class rosaZylaCal:
 		self.noiseFile=config[self.instrument]['noiseFile']
 		self.obsDate=config[self.instrument]['obsDate']
 		self.obsTime=config[self.instrument]['obsTime']
+		self.expTimems=config[self.instrument]['expTimems']
 		self.speckledFileForm=config[self.instrument]['speckledFileForm']
 		self.workBase=config[self.instrument]['workBase']
 
@@ -620,6 +626,7 @@ class rosaZylaCal:
 		"""
 		if dataShape is None:
 			dataShape=self.dataShape
+		
 		if imageShape is None:
 			imageShape=self.imageShape
 
@@ -688,6 +695,18 @@ class rosaZylaCal:
 			self.logger.critical("Could not save binary file: {0}".format(err))
 			raise
 
+	def zyla_time(self, file_number):
+	
+		year = int(self.obsDate[0:4])
+		month = int(self.obsDate[4:6])
+		day = int(self.obsDate[6:8])
+		hour = int(self.obsTime[0:2])
+		minute = int(self.obsTime[2:4])
+		second = int(self.obsTime[4:6])# + ()
+		t = Time(datetime(year, month, day, hour, minute, second))
+		dt = TimeDelta(0.001 * int(self.expTimems) * int(self.burstNumber) * file_number,format = 'sec')
+		return (t + dt)
+
 	def rosa_zyla_save_bursts(self):
 		"""
 		Main method to save burst cubes formatted for KISIP.
@@ -739,6 +758,10 @@ class rosaZylaCal:
 								burstHndrds
 							)
 						)
+					text_file = open(burstFile+'.txt', "w")
+					text_file.write('DATE    ='+ self.zyla_time(1000*burstThsnds+burstHndrds).fits + "\n")
+					text_file.write('EXPOSURE='+ self.expTimems)
+					text_file.close()
 					self.rosa_zyla_save_binary_image_cube(
 							burstCube,
 							burstFile
@@ -904,27 +927,17 @@ class rosaZylaCal:
 		for b in range (len(fList)):
 			proxy1 = fList[b].split('speckle.batch.')
 			proxy2 = proxy1[1].split('.')
-			fListOrder.append(proxy2[1])
+			fListOrder.append(proxy2[0]+proxy2[1])
 		fListOrder = [int(s) for s in fListOrder]
-		fListCorrect = list(fList)
-		for i in range(len(fList)): fListCorrect[fListOrder[i]] = fList[i]
-		#print(fList, fListOrder, fListCorrect)
-
-		#print(glob.glob(self.preSpeckleBase+'/*.txt'))
-		headerList = glob.glob(os.path.join(self.preSpeckleBase+'/*.txt'))
-		#print(headerList)
+		header_prefix = self.preSpeckleBase+'/'+self.obsDate+'_'+self.obsTime
+		headerList = glob.glob(header_prefix+'*.txt')
 		headerListOrder = []
 		for b in range (len(headerList)):
 			proxy1 = headerList[b].split('raw.batch.')
 			proxy2 = proxy1[1].split('.')
-			headerListOrder.append(proxy2[1])
-			#print(proxy1)
+			headerListOrder.append(proxy2[0]+proxy2[1])
 		headerListOrder = [int(s) for s in headerListOrder]
-		#print(headerListOrder)
-		#headerList = headerList[headerListOrder]
-		headerListCorrect = list(headerList)
-		for i in range(len(headerList)): headerListCorrect[headerListOrder[i]] = headerList[i]
-		#print(fListCorrect,headerListCorrect)
+		
 		try:
 			assert(len(fList) != 0)
 		except Exception as err:
@@ -932,8 +945,6 @@ class rosaZylaCal:
 			raise
 		else:
 			self.logger.info("Found {0} files.".format(len(fList)))
-		#for file in fList:
-		#print(fListCorrect)
 		for i in range(len(fList)):
 			im=self.rosa_zyla_read_binary_image(fList[i],
 					imageShape=self.imageShape,
@@ -941,8 +952,8 @@ class rosaZylaCal:
 					dtype=np.float32
 					)
 			fName=os.path.basename(fList[i])
-			#print(i)
-			headerFile = open(headerListCorrect[i], "r")
+			my_file_index = headerListOrder.index(fListOrder[i])
+			headerFile = open(headerList[my_file_index], "r")
 			self.rosa_zyla_save_fits_image(im, os.path.join( 
 				self.postSpeckleBase,
 				fName+'.fits'
@@ -967,29 +978,40 @@ class rosaZylaCal:
 		"""
 		#for i in range(len(header)): header[i].translate({ord("'"): None})
 		#print(header)
-		hdu=fits.PrimaryHDU(image)
-		if len(header) == 35:
-			hdr = hdu.header
-			indexHeader = [5,6,7,8]
-			for i in indexHeader:
-				lineBreak = header[i].split('=')
-				lineBreak2 = lineBreak[1].split('/')
+		if 'ROSA' in self.instrument:
+			hdu=fits.PrimaryHDU(image)
+			if len(header) == 35:
+				hdr = hdu.header
+				indexHeader = [5,6,7,8]
+				for i in indexHeader:
+					lineBreak = header[i].split('=')
+					lineBreak2 = lineBreak[1].split('/')
 		#		print(i)
 		#		print(type(str(lineBreak2[0])))
-				hdr[lineBreak[0]] = int(lineBreak2[0])
-			indexHeaderString = [9, 10, 11, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
-			for i in indexHeaderString:
-				lineBreak = header[i].split('=')
-				lineBreak2 = lineBreak[1].split('/')
+					hdr[lineBreak[0]] = int(lineBreak2[0])
+				indexHeaderString = [9, 10, 11, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+				for i in indexHeaderString:
+					lineBreak = header[i].split('=')
+					lineBreak2 = lineBreak[1].split('/')
 				#print('s')
-				hdr[lineBreak[0]] = lineBreak2[0].replace('\n',' ').replace("'",'').strip()
+					hdr[lineBreak[0]] = lineBreak2[0].replace('\n',' ').replace("'",'').strip()
 		#	print(hdr)
 			#empty_primary = fits.PrimaryHDU(header = hdr)
                 #try:
 				#	hdr[lineBreak[0]]=lineBreak2[0]#.translate({ord("'"): None})
 		#hdr = hdu.header
-		hdul=fits.HDUList([hdu])
-		
+			hdul=fits.HDUList([hdu])
+		if 'ZYLA' in self.instrument:
+			hdu=fits.PrimaryHDU(image)
+			if len(header) == 2:
+				hdr = hdu.header
+				lineBreak = header[0].split('=')
+				hdr[lineBreak[0]] = lineBreak[1].replace("\n",' ')
+				lineBreak = header[1].split('=')
+				hdr[lineBreak[0]] = lineBreak[1]
+				hdr['comment'] = 'WARNING: Timestamps were reconstructed during the data reduction.' 
+				hdr['comment'] = 'Timestamp = start time + burst number * time exposure * file number'
+			hdul = fits.HDUList([hdu])
 		try:
 			hdul.writeto(file, clobber=clobber)
 		except Exception as err:
